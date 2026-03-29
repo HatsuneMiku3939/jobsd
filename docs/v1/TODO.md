@@ -10,11 +10,11 @@
 
 ## Phase 0: Repository Bootstrap
 
-- [ ] Create `go.mod` with the project module path.
-- [ ] Add the initial dependencies: `cobra`, `modernc.org/sqlite`, and `robfig/cron/v3`.
-- [ ] Create `cmd/jobsd/main.go` with a minimal entrypoint.
-- [ ] Add build-time version variables and wire them into the main package.
-- [ ] Add a `.gitignore` suitable for Go binaries, test artifacts, and editor files.
+- [x] Create `go.mod` with the project module path.
+- [x] Add the initial dependencies: `cobra`, `modernc.org/sqlite`, and `robfig/cron/v3`.
+- [x] Create `cmd/jobsd/main.go` with a minimal entrypoint.
+- [x] Add build-time version variables and wire them into the main package.
+- [x] Add a `.gitignore` suitable for Go binaries, test artifacts, and editor files.
 
 ## Phase 1: Core Project Skeleton
 

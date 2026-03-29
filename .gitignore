@@ -1,0 +1,12 @@
+/jobsd
+/jobsd.exe
+bin/
+dist/
+*.test
+*.out
+coverage.out
+*.coverprofile
+.idea/
+.vscode/
+*.swp
+.DS_Store
