@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,8 @@ import (
 	"github.com/hatsunemiku3939/jobsd/internal/daemon"
 	"github.com/hatsunemiku3939/jobsd/internal/domain"
 )
+
+const windowsCommandTimeout = 30 * time.Second
 
 type schedulerCommandOutput struct {
 	Instance string                 `json:"instance"`
@@ -101,12 +104,13 @@ func buildJobsdBinary(t *testing.T) string {
 	t.Helper()
 
 	binaryPath := filepath.Join(t.TempDir(), "jobsd.exe")
-	cmd := exec.Command("go", "build", "-o", binaryPath, ".")
+	cmd, cancel := newTimedCommand(t, "go", "build", "-o", binaryPath, ".")
+	defer cancel()
 	cmd.Dir = "."
 	cmd.Env = os.Environ()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("go build error = %v, output = %s", err, output)
+		failTimedCommand(t, cmd, err, output)
 	}
 
 	return binaryPath
@@ -126,9 +130,15 @@ func runJobsdJSON(t *testing.T, binaryPath string, args ...string) schedulerComm
 }
 
 func runJobsdExpectError(binaryPath string, args ...string) error {
-	cmd := exec.Command(binaryPath, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), windowsCommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binaryPath, args...)
 	cmd.Env = os.Environ()
 	output, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("command timed out after %s: %s %v", windowsCommandTimeout, binaryPath, args)
+	}
 	if err == nil {
 		return nil
 	}
@@ -144,11 +154,12 @@ func runJobsdExpectError(binaryPath string, args ...string) error {
 func runJobsd(t *testing.T, binaryPath string, args ...string) []byte {
 	t.Helper()
 
-	cmd := exec.Command(binaryPath, args...)
+	cmd, cancel := newTimedCommand(t, binaryPath, args...)
+	defer cancel()
 	cmd.Env = os.Environ()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("%s %v error = %v, output = %s", binaryPath, args, err, output)
+		failTimedCommand(t, cmd, err, output)
 	}
 
 	return output
@@ -157,9 +168,27 @@ func runJobsd(t *testing.T, binaryPath string, args ...string) []byte {
 func runStopIfRunning(t *testing.T, binaryPath string, instance string) {
 	t.Helper()
 
-	cmd := exec.Command(binaryPath, "--output", "json", "scheduler", "stop", "--instance", instance)
+	cmd, cancel := newTimedCommand(t, binaryPath, "--output", "json", "scheduler", "stop", "--instance", instance)
+	defer cancel()
 	cmd.Env = os.Environ()
 	_, _ = cmd.CombinedOutput()
+}
+
+func newTimedCommand(t *testing.T, name string, args ...string) (*exec.Cmd, context.CancelFunc) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), windowsCommandTimeout)
+	return exec.CommandContext(ctx, name, args...), cancel
+}
+
+func failTimedCommand(t *testing.T, cmd *exec.Cmd, err error, output []byte) {
+	t.Helper()
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("%s %v timed out after %s, output = %s", cmd.Path, cmd.Args[1:], windowsCommandTimeout, output)
+	}
+
+	t.Fatalf("%s %v error = %v, output = %s", cmd.Path, cmd.Args[1:], err, output)
 }
 
 func waitForStateFile(t *testing.T, path string) {

@@ -31,7 +31,19 @@ jobs:
         run: go vet ./...
 
       - name: Test
+        if: runner.os != 'Windows'
         run: go test ./...
+
+      - name: Test (windows packages excluding cmd/jobsd)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $packages = go list ./... | Where-Object { $_ -ne 'github.com/hatsunemiku3939/jobsd/cmd/jobsd' }
+          go test $packages
+
+      - name: Windows command package verification
+        if: runner.os == 'Windows'
+        run: go test ./cmd/jobsd -run TestCurrentBuildInfo -count=1
 
       - name: Windows lifecycle verification
         if: runner.os == 'Windows'
