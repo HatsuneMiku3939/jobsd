@@ -13,8 +13,6 @@ import (
 )
 
 func TestShellExecutorExecute(t *testing.T) {
-	t.Setenv("GO_WANT_EXECUTOR_HELPER", "1")
-
 	tests := []struct {
 		name         string
 		command      string
@@ -206,68 +204,62 @@ func TestExecutorHelperProcess(t *testing.T) {
 		return
 	}
 
-	separator := -1
-	for i, arg := range os.Args {
-		if arg == "--" {
-			separator = i
-			break
-		}
-	}
-	if separator < 0 || separator+1 >= len(os.Args) {
-		os.Exit(2)
-	}
+	mode := os.Getenv("GO_EXECUTOR_MODE")
+	arg1 := os.Getenv("GO_EXECUTOR_ARG1")
+	arg2 := os.Getenv("GO_EXECUTOR_ARG2")
+	arg3 := os.Getenv("GO_EXECUTOR_ARG3")
+	arg4 := os.Getenv("GO_EXECUTOR_ARG4")
 
-	args := os.Args[separator+1:]
-	switch args[0] {
+	switch mode {
 	case "noop":
 		os.Exit(0)
 	case "stdout":
-		if _, err := os.Stdout.WriteString(args[1]); err != nil {
+		if _, err := os.Stdout.WriteString(arg1); err != nil {
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(2)
 		}
 		os.Exit(0)
 	case "stderr":
-		if _, err := os.Stderr.WriteString(args[1]); err != nil {
+		if _, err := os.Stderr.WriteString(arg1); err != nil {
 			os.Exit(2)
 		}
 		os.Exit(0)
 	case "stdout-repeat":
-		writeRepeatedString(os.Stdout, args[2], args[1])
+		writeRepeatedString(os.Stdout, arg2, arg1)
 		os.Exit(0)
 	case "stderr-repeat":
-		writeRepeatedString(os.Stderr, args[2], args[1])
+		writeRepeatedString(os.Stderr, arg2, arg1)
 		os.Exit(0)
 	case "mixed":
-		if _, err := os.Stdout.WriteString(args[1]); err != nil {
+		if _, err := os.Stdout.WriteString(arg1); err != nil {
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(2)
 		}
-		if _, err := os.Stderr.WriteString(args[2]); err != nil {
+		if _, err := os.Stderr.WriteString(arg2); err != nil {
 			os.Exit(2)
 		}
 		os.Exit(0)
 	case "mixed-repeat":
-		writeRepeatedString(os.Stdout, args[2], args[1])
-		writeRepeatedString(os.Stderr, args[4], args[3])
+		writeRepeatedString(os.Stdout, arg2, arg1)
+		writeRepeatedString(os.Stderr, arg4, arg3)
 		os.Exit(0)
 	case "stderr-exit":
-		if _, err := os.Stderr.WriteString(args[1]); err != nil {
+		if _, err := os.Stderr.WriteString(arg1); err != nil {
 			os.Exit(2)
 		}
-		code, err := strconv.Atoi(args[2])
+		code, err := strconv.Atoi(arg2)
 		if err != nil {
 			os.Exit(2)
 		}
 		os.Exit(code)
 	case "sleep":
-		if len(args) > 2 {
-			if _, err := os.Stdout.WriteString(args[2]); err != nil {
+		if arg2 != "" {
+			if _, err := os.Stdout.WriteString(arg2); err != nil {
 				fmt.Fprint(os.Stderr, err)
 				os.Exit(2)
 			}
 		}
-		delayMS, err := strconv.Atoi(args[1])
+		delayMS, err := strconv.Atoi(arg1)
 		if err != nil {
 			os.Exit(2)
 		}

@@ -3,6 +3,7 @@
 package daemon
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -21,16 +22,16 @@ func TestShellCommandWindows(t *testing.T) {
 func helperCommand(t *testing.T, args ...string) string {
 	t.Helper()
 
-	parts := []string{
-		windowsShellQuote(testBinaryPath(t)),
-		windowsShellQuote("-test.run=TestExecutorHelperProcess"),
-		windowsShellQuote("--"),
+	parts := []string{`set "GO_WANT_EXECUTOR_HELPER=1"`}
+	for index, arg := range args {
+		parts = append(parts, `set "GO_EXECUTOR_ARG`+strconv.Itoa(index)+`=`+arg+`"`)
 	}
-	for _, arg := range args {
-		parts = append(parts, windowsShellQuote(arg))
+	if len(args) > 0 {
+		parts = append(parts, `set "GO_EXECUTOR_MODE=`+args[0]+`"`)
 	}
+	parts = append(parts, windowsShellQuote(testBinaryPath(t))+` `+windowsShellQuote("-test.run=TestExecutorHelperProcess"))
 
-	return `"` + strings.Join(parts, " ") + `"`
+	return strings.Join(parts, " && ")
 }
 
 func testBinaryPath(t *testing.T) string {
