@@ -10,7 +10,7 @@ help: Makefile
 
 ## build: Build the project for production
 build:
-	go build ./cmd/jobsd
+	go build -o ./bin/jobsd ./cmd/jobsd
 
 ## test: Run all tests
 test:
