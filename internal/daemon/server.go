@@ -143,19 +143,32 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		slog.String("db_path", resolvedPaths.DatabasePath),
 	)
 
+	shuttingDown := false
 	select {
 	case <-signalCtx.Done():
+		shuttingDown = true
 	case <-shutdownRequested:
+		shuttingDown = true
 	case err := <-controlErrCh:
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("control api stopped unexpectedly")
+		shuttingDown = signalCtx.Err() != nil || ctx.Err() != nil
+		if !shuttingDown {
+			return fmt.Errorf("control api stopped unexpectedly")
+		}
 	case err := <-loopErrCh:
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("scheduler loop stopped unexpectedly")
+		shuttingDown = signalCtx.Err() != nil || ctx.Err() != nil
+		if !shuttingDown {
+			return fmt.Errorf("scheduler loop stopped unexpectedly")
+		}
+	}
+
+	if !shuttingDown {
+		return fmt.Errorf("scheduler shutdown state was not reached")
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
