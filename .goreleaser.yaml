@@ -33,6 +33,19 @@ archives:
       - README*
       - LICENSE*
 
+nfpms:
+  - id: linux-packages
+    package_name: jobsd
+    maintainer: "HatsuneMiku3939 <hatsunemiku3939@users.noreply.github.com>"
+    ids:
+      - jobsd
+    formats:
+      - deb
+      - rpm
+    file_name_template: "{{ .ConventionalFileName }}"
+    homepage: "https://github.com/HatsuneMiku3939/jobsd"
+    description: "Local, instance-oriented job scheduler backed by SQLite"
+
 homebrew_casks:
   - name: jobsd
     ids:

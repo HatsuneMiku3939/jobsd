@@ -19,6 +19,13 @@ type goreleaserConfig struct {
 		NameTemplate string   `yaml:"name_template"`
 		Files        []string `yaml:"files"`
 	} `yaml:"archives"`
+	NFPMS []struct {
+		ID               string   `yaml:"id"`
+		PackageName      string   `yaml:"package_name"`
+		IDs              []string `yaml:"ids"`
+		Formats          []string `yaml:"formats"`
+		FileNameTemplate string   `yaml:"file_name_template"`
+	} `yaml:"nfpms"`
 	HomebrewCasks []struct {
 		Name       string   `yaml:"name"`
 		IDs        []string `yaml:"ids"`
@@ -100,6 +107,34 @@ func TestGoReleaserConfigPublishesHomebrewCask(t *testing.T) {
 	}
 	if cask.Repository.Owner != "HatsuneMiku3939" || cask.Repository.Name != "homebrew-tap" {
 		t.Fatalf("unexpected cask repository: %s/%s", cask.Repository.Owner, cask.Repository.Name)
+	}
+}
+
+func TestGoReleaserConfigBuildsLinuxPackages(t *testing.T) {
+	t.Parallel()
+
+	config := loadGoReleaserConfig(t)
+	if len(config.NFPMS) != 1 {
+		t.Fatalf("nfpms = %d, want 1", len(config.NFPMS))
+	}
+
+	nfpm := config.NFPMS[0]
+	if nfpm.ID != "linux-packages" {
+		t.Fatalf("unexpected nfpm id: %s", nfpm.ID)
+	}
+	if nfpm.PackageName != "jobsd" {
+		t.Fatalf("unexpected package name: %s", nfpm.PackageName)
+	}
+	if !stringSliceContains(nfpm.IDs, "jobsd") {
+		t.Fatalf("nfpm ids = %v, want jobsd", nfpm.IDs)
+	}
+	for _, format := range []string{"deb", "rpm"} {
+		if !stringSliceContains(nfpm.Formats, format) {
+			t.Fatalf("nfpm formats = %v, want %q", nfpm.Formats, format)
+		}
+	}
+	if nfpm.FileNameTemplate != "{{ .ConventionalFileName }}" {
+		t.Fatalf("unexpected nfpm file name template: %s", nfpm.FileNameTemplate)
 	}
 }
 
