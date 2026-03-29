@@ -28,7 +28,14 @@ Install on Linux or Windows from GitHub Releases:
 https://github.com/HatsuneMiku3939/jobsd/releases
 ```
 
-Choose the archive that matches your platform:
+Install on Linux with native packages when available:
+
+- `jobsd_<version>_x86_64.deb`
+- `jobsd_<version>_arm64.deb`
+- `jobsd-<version>-1.x86_64.rpm`
+- `jobsd-<version>-1.aarch64.rpm`
+
+You can also use the release archives:
 
 - `jobsd_<version>_Linux_x86_64.tar.gz`
 - `jobsd_<version>_Linux_arm64.tar.gz`
