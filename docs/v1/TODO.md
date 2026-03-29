@@ -83,16 +83,16 @@
 
 ## Phase 7: Schedule Parsing
 
-- [ ] Implement parsing for `every <duration>` in `internal/schedule/parser.go`.
-- [ ] Implement parsing for `cron <expr>`.
-- [ ] Implement parsing for `after <duration>`.
-- [ ] Implement schedule normalization into `ScheduleKind` and expression fields.
-- [ ] Implement next-run calculation for interval schedules.
-- [ ] Implement next-run calculation for cron schedules.
-- [ ] Implement next-run calculation for one-time schedules.
-- [ ] Add table-driven tests for valid schedule strings.
-- [ ] Add table-driven tests for invalid schedule strings.
-- [ ] Add tests for next-run calculation edge cases.
+- [x] Implement parsing for `every <duration>` in `internal/schedule/parser.go`.
+- [x] Implement parsing for `cron <expr>`.
+- [x] Implement parsing for `after <duration>`.
+- [x] Implement schedule normalization into `ScheduleKind` and expression fields.
+- [x] Implement next-run calculation for interval schedules.
+- [x] Implement next-run calculation for cron schedules.
+- [x] Implement next-run calculation for one-time schedules.
+- [x] Add table-driven tests for valid schedule strings.
+- [x] Add table-driven tests for invalid schedule strings.
+- [x] Add tests for next-run calculation edge cases.
 
 ## Phase 8: File Locking
 
@@ -153,6 +153,8 @@
 - [ ] Query due jobs using `enabled = 1` and `next_run_at <= now`.
 - [ ] Enqueue scheduled runs.
 - [ ] Recompute and persist `next_run_at` after scheduled enqueue.
+- [ ] For one-time schedules, disable the job after scheduled enqueue.
+- [ ] For one-time schedules, clear `next_run_at` after scheduled enqueue.
 - [ ] Claim pending runs for execution.
 - [ ] Mark claimed runs as running.
 - [ ] Execute claimed runs through the executor.
@@ -176,10 +178,12 @@
 - [ ] Implement `job add`.
 - [ ] Validate required flags and parse schedules before persistence.
 - [ ] Compute initial `next_run_at` unless the job is disabled.
+- [ ] Compute initial `next_run_at` for enabled one-time schedules.
 - [ ] Implement `job list`.
 - [ ] Implement `job get`.
 - [ ] Implement `job update` with partial field updates.
 - [ ] Recompute `next_run_at` when schedule, timezone, or enabled state changes.
+- [ ] Recompute `next_run_at` correctly for one-time schedules on update and resume.
 - [ ] Implement `job delete`.
 - [ ] Implement `job pause`.
 - [ ] Implement `job resume`.
