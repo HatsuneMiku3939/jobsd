@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -13,6 +14,10 @@ import (
 )
 
 func TestWindowsSchedulerLifecycle(t *testing.T) {
+	if shouldSkipWindowsLifecycleE2E(os.Getenv("CI"), os.Getenv("GITHUB_ACTIONS")) {
+		t.Skip("windows lifecycle e2e is skipped in CI; use docs/MANUAL_E2E_CHECKLIST.md for manual verification")
+	}
+
 	baseDir := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(baseDir, "data"))
 	t.Setenv("XDG_RUNTIME_DIR", filepath.Join(baseDir, "runtime"))
