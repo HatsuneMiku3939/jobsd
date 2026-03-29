@@ -115,25 +115,25 @@
 
 ## Phase 10: Control API
 
-- [ ] Implement token generation for daemon instances.
-- [ ] Store the token in the runtime state file.
-- [ ] Implement `GET /v1/ping`.
-- [ ] Implement `GET /v1/scheduler`.
-- [ ] Implement `POST /v1/scheduler/shutdown`.
-- [ ] Reject requests with a missing or invalid `X-Jobs-Token`.
-- [ ] Add integration tests for control API success cases.
-- [ ] Add integration tests for authentication failures.
+- [x] Implement token generation for daemon instances.
+- [x] Store the token in the runtime state file.
+- [x] Implement `GET /v1/ping`.
+- [x] Implement `GET /v1/scheduler`.
+- [x] Implement `POST /v1/scheduler/shutdown`.
+- [x] Reject requests with a missing or invalid `X-Jobs-Token`.
+- [x] Add integration tests for control API success cases.
+- [x] Add integration tests for authentication failures.
 
 ## Phase 11: Scheduler Start, Status, Stop, and Ping
 
-- [ ] Implement `scheduler start` parent flow and readiness polling.
-- [ ] Implement timeout and error reporting for failed startup.
-- [ ] Implement `scheduler status` using state file plus control API.
-- [ ] Classify status as `running`, `stale`, or `stopped`.
-- [ ] Implement `scheduler stop` with graceful shutdown verification.
-- [ ] Implement `scheduler ping` with correct exit codes.
-- [ ] Add CLI tests for required flags and output modes.
-- [ ] Add integration tests for start and stop flow.
+- [x] Implement `scheduler start` parent flow and readiness polling.
+- [x] Implement timeout and error reporting for failed startup.
+- [x] Implement `scheduler status` using state file plus control API.
+- [x] Classify status as `running`, `stale`, or `stopped`.
+- [x] Implement `scheduler stop` with graceful shutdown verification.
+- [x] Implement `scheduler ping` with correct exit codes.
+- [x] Add CLI tests for required flags and output modes.
+- [x] Add integration tests for start and stop flow.
 
 ## Phase 11.5: Windows Runtime Support
 

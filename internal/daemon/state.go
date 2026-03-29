@@ -127,6 +127,9 @@ func decodeSchedulerState(raw schedulerStateJSON) (domain.SchedulerState, error)
 	if raw.Port <= 0 {
 		return domain.SchedulerState{}, fmt.Errorf("%w: port must be positive", ErrStateCorrupt)
 	}
+	if raw.Token == "" {
+		return domain.SchedulerState{}, fmt.Errorf("%w: token is required", ErrStateCorrupt)
+	}
 	if raw.DBPath == "" {
 		return domain.SchedulerState{}, fmt.Errorf("%w: db_path is required", ErrStateCorrupt)
 	}
@@ -162,6 +165,9 @@ func validateSchedulerState(state domain.SchedulerState) error {
 	}
 	if state.Port <= 0 {
 		return fmt.Errorf("state port must be positive")
+	}
+	if state.Token == "" {
+		return fmt.Errorf("state token is required")
 	}
 	if state.DBPath == "" {
 		return fmt.Errorf("state db path is required")

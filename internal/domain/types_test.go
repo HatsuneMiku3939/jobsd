@@ -15,17 +15,21 @@ func TestEnumValidation(t *testing.T) {
 		{name: "run status invalid", got: RunStatus("bad").IsValid()},
 		{name: "policy valid", got: ConcurrencyPolicyQueue.IsValid()},
 		{name: "policy invalid", got: ConcurrencyPolicy("bad").IsValid()},
+		{name: "scheduler status valid", got: SchedulerStatusRunning.IsValid()},
+		{name: "scheduler status invalid", got: SchedulerStatus("bad").IsValid()},
 	}
 
 	want := map[string]bool{
-		"schedule kind valid":   true,
-		"schedule kind invalid": false,
-		"trigger type valid":    true,
-		"trigger type invalid":  false,
-		"run status valid":      true,
-		"run status invalid":    false,
-		"policy valid":          true,
-		"policy invalid":        false,
+		"schedule kind valid":      true,
+		"schedule kind invalid":    false,
+		"trigger type valid":       true,
+		"trigger type invalid":     false,
+		"run status valid":         true,
+		"run status invalid":       false,
+		"policy valid":             true,
+		"policy invalid":           false,
+		"scheduler status valid":   true,
+		"scheduler status invalid": false,
 	}
 
 	for _, tt := range tests {

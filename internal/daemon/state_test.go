@@ -16,7 +16,7 @@ func TestStateRoundTrip(t *testing.T) {
 		Instance:  "dev",
 		PID:       1234,
 		Port:      8080,
-		Token:     "",
+		Token:     "token-123",
 		DBPath:    "/tmp/jobs.db",
 		StartedAt: time.Date(2025, 4, 1, 12, 0, 0, 0, time.UTC),
 		Version:   "v1.0.0",

@@ -86,6 +86,12 @@ Expected output:
 - process information if available
 - database path
 
+Status values:
+
+- `running`
+- `stale`
+- `stopped`
+
 #### `jobsd scheduler stop`
 
 Stop a running scheduler instance.

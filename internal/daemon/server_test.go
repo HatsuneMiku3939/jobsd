@@ -2,9 +2,13 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,6 +20,7 @@ import (
 
 func TestServeWritesStateAndMetadata(t *testing.T) {
 	paths := testPaths(t, "dev")
+	port := freePort(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
@@ -23,7 +28,7 @@ func TestServeWritesStateAndMetadata(t *testing.T) {
 	go func() {
 		errCh <- Serve(ctx, ServeOptions{
 			Instance: "dev",
-			Port:     8080,
+			Port:     port,
 			Paths:    paths,
 			Version:  "v1.0.0",
 			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -39,11 +44,11 @@ func TestServeWritesStateAndMetadata(t *testing.T) {
 	if state.Instance != "dev" {
 		t.Fatalf("state.Instance = %q, want %q", state.Instance, "dev")
 	}
-	if state.Port != 8080 {
-		t.Fatalf("state.Port = %d, want %d", state.Port, 8080)
+	if state.Port != port {
+		t.Fatalf("state.Port = %d, want %d", state.Port, port)
 	}
-	if state.Token != "" {
-		t.Fatalf("state.Token = %q, want empty string", state.Token)
+	if state.Token == "" {
+		t.Fatal("state.Token = empty, want non-empty")
 	}
 
 	db, err := sqlite.Open(paths.DatabasePath)
@@ -61,8 +66,8 @@ func TestServeWritesStateAndMetadata(t *testing.T) {
 	if meta.InstanceName != "dev" {
 		t.Fatalf("meta.InstanceName = %q, want %q", meta.InstanceName, "dev")
 	}
-	if meta.SchedulerPort != 8080 {
-		t.Fatalf("meta.SchedulerPort = %d, want %d", meta.SchedulerPort, 8080)
+	if meta.SchedulerPort != port {
+		t.Fatalf("meta.SchedulerPort = %d, want %d", meta.SchedulerPort, port)
 	}
 
 	cancel()
@@ -75,8 +80,175 @@ func TestServeWritesStateAndMetadata(t *testing.T) {
 	}
 }
 
+func TestServeControlAPISuccessAndAuthFailures(t *testing.T) {
+	paths := testPaths(t, "dev")
+	port := freePort(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Serve(ctx, ServeOptions{
+			Instance: "dev",
+			Port:     port,
+			Paths:    paths,
+			Version:  "v1.0.0",
+			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		})
+	}()
+
+	waitForStateFile(t, paths.StatePath)
+	state, err := ReadState(paths.StatePath)
+	if err != nil {
+		t.Fatalf("ReadState() error = %v", err)
+	}
+	waitForControlReady(t, port, state.Token)
+
+	t.Run("ping success", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/ping"), nil)
+		if err != nil {
+			t.Fatalf("NewRequestWithContext() error = %v", err)
+		}
+		req.Header.Set(jobsTokenHeader, state.Token)
+
+		response, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Do() error = %v", err)
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("StatusCode = %d, want %d", response.StatusCode, http.StatusOK)
+		}
+
+		var payload PingResponse
+		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+			t.Fatalf("Decode() error = %v", err)
+		}
+		if payload.Status != domain.SchedulerStatusRunning {
+			t.Fatalf("payload.Status = %q, want %q", payload.Status, domain.SchedulerStatusRunning)
+		}
+	})
+
+	t.Run("scheduler success", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/scheduler"), nil)
+		if err != nil {
+			t.Fatalf("NewRequestWithContext() error = %v", err)
+		}
+		req.Header.Set(jobsTokenHeader, state.Token)
+
+		response, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Do() error = %v", err)
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("StatusCode = %d, want %d", response.StatusCode, http.StatusOK)
+		}
+
+		var payload SchedulerResponse
+		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+			t.Fatalf("Decode() error = %v", err)
+		}
+		if payload.DBPath != paths.DatabasePath {
+			t.Fatalf("payload.DBPath = %q, want %q", payload.DBPath, paths.DatabasePath)
+		}
+	})
+
+	t.Run("missing token", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/ping"), nil)
+		if err != nil {
+			t.Fatalf("NewRequestWithContext() error = %v", err)
+		}
+
+		response, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Do() error = %v", err)
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("StatusCode = %d, want %d", response.StatusCode, http.StatusUnauthorized)
+		}
+	})
+
+	t.Run("invalid token", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/ping"), nil)
+		if err != nil {
+			t.Fatalf("NewRequestWithContext() error = %v", err)
+		}
+		req.Header.Set(jobsTokenHeader, "wrong-token")
+
+		response, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Do() error = %v", err)
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("StatusCode = %d, want %d", response.StatusCode, http.StatusUnauthorized)
+		}
+	})
+
+	cancel()
+	if err := <-errCh; err != nil {
+		t.Fatalf("Serve() error = %v", err)
+	}
+}
+
+func TestServeShutdownEndpointRemovesState(t *testing.T) {
+	paths := testPaths(t, "dev")
+	port := freePort(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Serve(ctx, ServeOptions{
+			Instance: "dev",
+			Port:     port,
+			Paths:    paths,
+			Version:  "v1.0.0",
+			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		})
+	}()
+
+	waitForStateFile(t, paths.StatePath)
+	state, err := ReadState(paths.StatePath)
+	if err != nil {
+		t.Fatalf("ReadState() error = %v", err)
+	}
+	waitForControlReady(t, port, state.Token)
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, controlURL(port, "/v1/scheduler/shutdown"), nil)
+	if err != nil {
+		t.Fatalf("NewRequestWithContext() error = %v", err)
+	}
+	req.Header.Set(jobsTokenHeader, state.Token)
+
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do() error = %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("StatusCode = %d, want %d", response.StatusCode, http.StatusNoContent)
+	}
+
+	if err := <-errCh; err != nil {
+		t.Fatalf("Serve() error = %v", err)
+	}
+	if _, err := ReadState(paths.StatePath); !errors.Is(err, ErrStateNotFound) {
+		t.Fatalf("ReadState() after shutdown error = %v, want %v", err, ErrStateNotFound)
+	}
+}
+
 func TestServeRejectsDuplicateInstance(t *testing.T) {
 	paths := testPaths(t, "dev")
+	firstPort := freePort(t)
+	secondPort := freePort(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
@@ -84,7 +256,7 @@ func TestServeRejectsDuplicateInstance(t *testing.T) {
 	go func() {
 		errCh <- Serve(ctx, ServeOptions{
 			Instance: "dev",
-			Port:     8080,
+			Port:     firstPort,
 			Paths:    paths,
 			Version:  "v1.0.0",
 			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -95,7 +267,7 @@ func TestServeRejectsDuplicateInstance(t *testing.T) {
 
 	err := Serve(context.Background(), ServeOptions{
 		Instance: "dev",
-		Port:     8081,
+		Port:     secondPort,
 		Paths:    paths,
 		Version:  "v1.0.0",
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -116,6 +288,8 @@ func TestServeRejectsDuplicateInstance(t *testing.T) {
 func TestServeAllowsIndependentInstances(t *testing.T) {
 	firstPaths := testPaths(t, "first")
 	secondPaths := testPaths(t, "second")
+	firstPort := freePort(t)
+	secondPort := freePort(t)
 
 	firstCtx, firstCancel := context.WithCancel(context.Background())
 	secondCtx, secondCancel := context.WithCancel(context.Background())
@@ -125,7 +299,7 @@ func TestServeAllowsIndependentInstances(t *testing.T) {
 	go func() {
 		firstErrCh <- Serve(firstCtx, ServeOptions{
 			Instance: "first",
-			Port:     8080,
+			Port:     firstPort,
 			Paths:    firstPaths,
 			Version:  "v1.0.0",
 		})
@@ -133,7 +307,7 @@ func TestServeAllowsIndependentInstances(t *testing.T) {
 	go func() {
 		secondErrCh <- Serve(secondCtx, ServeOptions{
 			Instance: "second",
-			Port:     8081,
+			Port:     secondPort,
 			Paths:    secondPaths,
 			Version:  "v1.0.0",
 		})
@@ -156,7 +330,8 @@ func TestServeAllowsIndependentInstances(t *testing.T) {
 func TestServePreservesCreatedAtAndUpdatesPort(t *testing.T) {
 	paths := testPaths(t, "dev")
 
-	runServeOnce(t, paths, 8080)
+	firstPort := freePort(t)
+	runServeOnce(t, paths, firstPort)
 
 	db, err := sqlite.Open(paths.DatabasePath)
 	if err != nil {
@@ -173,7 +348,8 @@ func TestServePreservesCreatedAtAndUpdatesPort(t *testing.T) {
 	}
 
 	time.Sleep(1100 * time.Millisecond)
-	runServeOnce(t, paths, 9090)
+	secondPort := freePort(t)
+	runServeOnce(t, paths, secondPort)
 
 	secondMeta, err := store.Get(context.Background())
 	if err != nil {
@@ -182,8 +358,8 @@ func TestServePreservesCreatedAtAndUpdatesPort(t *testing.T) {
 	if !secondMeta.CreatedAt.Equal(firstMeta.CreatedAt) {
 		t.Fatalf("CreatedAt changed: first=%v second=%v", firstMeta.CreatedAt, secondMeta.CreatedAt)
 	}
-	if secondMeta.SchedulerPort != 9090 {
-		t.Fatalf("SchedulerPort = %d, want %d", secondMeta.SchedulerPort, 9090)
+	if secondMeta.SchedulerPort != secondPort {
+		t.Fatalf("SchedulerPort = %d, want %d", secondMeta.SchedulerPort, secondPort)
 	}
 }
 
@@ -216,10 +392,8 @@ func waitForStateFile(t *testing.T, path string) {
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		state, err := ReadState(path)
-		if err == nil {
-			if state != (domain.SchedulerState{}) {
-				return
-			}
+		if err == nil && state != (domain.SchedulerState{}) {
+			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -239,4 +413,50 @@ func testPaths(t *testing.T, instance string) config.Paths {
 		LockPath:     filepath.Join(baseDir, "runtime", instance+".lock"),
 		StatePath:    filepath.Join(baseDir, "runtime", "state.json"),
 	}
+}
+
+func freePort(t *testing.T) int {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	defer listener.Close()
+
+	addr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("Addr() type = %T, want *net.TCPAddr", listener.Addr())
+	}
+
+	return addr.Port
+}
+
+func controlURL(port int, path string) string {
+	return fmt.Sprintf("http://127.0.0.1:%d%s", port, path)
+}
+
+func waitForControlReady(t *testing.T, port int, token string) {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/ping"), nil)
+		if err != nil {
+			t.Fatalf("NewRequestWithContext() error = %v", err)
+		}
+		req.Header.Set(jobsTokenHeader, token)
+
+		response, err := http.DefaultClient.Do(req)
+		if err == nil {
+			_ = response.Body.Close()
+			if response.StatusCode == http.StatusOK {
+				return
+			}
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	t.Fatalf("control api on port %d did not become ready", port)
 }

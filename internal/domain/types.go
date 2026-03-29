@@ -71,6 +71,23 @@ func (p ConcurrencyPolicy) IsValid() bool {
 	}
 }
 
+type SchedulerStatus string
+
+const (
+	SchedulerStatusRunning SchedulerStatus = "running"
+	SchedulerStatusStale   SchedulerStatus = "stale"
+	SchedulerStatusStopped SchedulerStatus = "stopped"
+)
+
+func (s SchedulerStatus) IsValid() bool {
+	switch s {
+	case SchedulerStatusRunning, SchedulerStatusStale, SchedulerStatusStopped:
+		return true
+	default:
+		return false
+	}
+}
+
 type RunOutput struct {
 	Stdout          string
 	Stderr          string

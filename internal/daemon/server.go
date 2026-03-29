@@ -60,16 +60,22 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		}
 		return fmt.Errorf("acquire instance lock: %w", err)
 	}
+	lockHeld := true
 	defer func() {
-		_ = fileLock.Release()
+		if lockHeld {
+			_ = fileLock.Release()
+		}
 	}()
 
 	db, err := sqlite.Open(resolvedPaths.DatabasePath)
 	if err != nil {
 		return fmt.Errorf("open instance database: %w", err)
 	}
+	dbOpen := true
 	defer func() {
-		_ = db.Close()
+		if dbOpen {
+			_ = db.Close()
+		}
 	}()
 
 	if err := sqlite.Migrate(ctx, db); err != nil {
@@ -80,18 +86,40 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		return err
 	}
 
+	token, err := generateToken()
+	if err != nil {
+		return err
+	}
+
 	startedAt := time.Now().UTC()
 	state := domain.SchedulerState{
 		Instance:  opts.Instance,
 		PID:       os.Getpid(),
 		Port:      opts.Port,
-		Token:     "",
+		Token:     token,
 		DBPath:    resolvedPaths.DatabasePath,
 		StartedAt: startedAt,
 		Version:   opts.Version,
 	}
 	if err := WriteState(resolvedPaths.StatePath, state); err != nil {
 		return fmt.Errorf("write state file: %w", err)
+	}
+	stateWritten := true
+	defer func() {
+		if stateWritten {
+			_ = RemoveState(resolvedPaths.StatePath)
+		}
+	}()
+
+	shutdownRequested := make(chan struct{}, 1)
+	controlServer, controlErrCh, err := startControlServer(state, func() {
+		select {
+		case shutdownRequested <- struct{}{}:
+		default:
+		}
+	})
+	if err != nil {
+		return err
 	}
 
 	signalCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
@@ -103,17 +131,36 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		slog.String("db_path", resolvedPaths.DatabasePath),
 	)
 
-	<-signalCtx.Done()
+	select {
+	case <-signalCtx.Done():
+	case <-shutdownRequested:
+	case err := <-controlErrCh:
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("control api stopped unexpectedly")
+	}
 
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := shutdownControlServer(shutdownCtx, controlServer); err != nil {
+		return err
+	}
+	if err := <-controlErrCh; err != nil {
+		return err
+	}
 	if err := RemoveState(resolvedPaths.StatePath); err != nil {
 		return fmt.Errorf("remove state file: %w", err)
 	}
+	stateWritten = false
 	if err := fileLock.Release(); err != nil {
 		return fmt.Errorf("release instance lock: %w", err)
 	}
+	lockHeld = false
 	if err := db.Close(); err != nil {
 		return fmt.Errorf("close instance database: %w", err)
 	}
+	dbOpen = false
 
 	return nil
 }
