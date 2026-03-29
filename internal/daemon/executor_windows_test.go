@@ -30,7 +30,7 @@ func helperCommand(t *testing.T, args ...string) string {
 		parts = append(parts, windowsShellQuote(arg))
 	}
 
-	return strings.Join(parts, " ")
+	return `"` + strings.Join(parts, " ") + `"`
 }
 
 func testBinaryPath(t *testing.T) string {
