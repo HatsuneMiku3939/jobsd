@@ -29,7 +29,7 @@ func NewRootCommand(info BuildInfo, stdout, stderr io.Writer) *cobra.Command {
 		Use:   "jobsd",
 		Short: "Manage instance-scoped local job schedulers",
 		Example: strings.TrimSpace(`
-jobsd scheduler start --instance dev --port 8080
+jobsd scheduler start --instance dev
 jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "echo cleanup"
 jobsd run list --instance dev
 jobsd version`),

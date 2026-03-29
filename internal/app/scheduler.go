@@ -42,7 +42,7 @@ func newSchedulerCommand(info BuildInfo) *cobra.Command {
 		Use:   "scheduler",
 		Short: "Manage scheduler lifecycle commands",
 		Example: strings.TrimSpace(`
-jobsd scheduler start --instance dev --port 8080
+jobsd scheduler start --instance dev
 jobsd scheduler status --instance dev
 jobsd scheduler stop --instance dev`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -63,19 +63,15 @@ jobsd scheduler stop --instance dev`),
 
 func newSchedulerStartCommand() *cobra.Command {
 	var instance string
-	var port int
 
 	cmd := &cobra.Command{
 		Use:     "start",
 		Short:   "Start a scheduler daemon for an instance",
-		Example: "jobsd scheduler start --instance dev --port 8080",
+		Example: "jobsd scheduler start --instance dev",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths, err := config.ResolvePaths(instance)
 			if err != nil {
 				return err
-			}
-			if port <= 0 || port > 65535 {
-				return fmt.Errorf("port must be between 1 and 65535")
 			}
 
 			inspection, err := inspectScheduler(cmd.Context(), instance)
@@ -95,7 +91,6 @@ func newSchedulerStartCommand() *cobra.Command {
 				"scheduler",
 				"serve",
 				"--instance", instance,
-				"--port", fmt.Sprintf("%d", port),
 			}
 			if err := startServeProcess(cmd.Context(), executable, serveArgs); err != nil {
 				return fmt.Errorf("start scheduler daemon: %w", err)
@@ -111,16 +106,13 @@ func newSchedulerStartCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&instance, "instance", "", "Instance name")
-	cmd.Flags().IntVar(&port, "port", 0, "Scheduler port")
 	_ = cmd.MarkFlagRequired("instance")
-	_ = cmd.MarkFlagRequired("port")
 
 	return cmd
 }
 
 func newSchedulerServeCommand(info BuildInfo) *cobra.Command {
 	var instance string
-	var port int
 
 	cmd := &cobra.Command{
 		Use:    "serve",
@@ -131,14 +123,10 @@ func newSchedulerServeCommand(info BuildInfo) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if port <= 0 || port > 65535 {
-				return fmt.Errorf("port must be between 1 and 65535")
-			}
 
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			return daemon.Serve(cmd.Context(), daemon.ServeOptions{
 				Instance: instance,
-				Port:     port,
 				Paths:    paths,
 				Version:  info.Version,
 				Logger:   logger,
@@ -147,9 +135,7 @@ func newSchedulerServeCommand(info BuildInfo) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&instance, "instance", "", "Instance name")
-	cmd.Flags().IntVar(&port, "port", 0, "Scheduler port")
 	_ = cmd.MarkFlagRequired("instance")
-	_ = cmd.MarkFlagRequired("port")
 
 	return cmd
 }

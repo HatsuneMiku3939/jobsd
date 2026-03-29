@@ -47,13 +47,33 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
+func listenControlListener(port int) (net.Listener, int, error) {
+	address := "127.0.0.1:0"
+	if port > 0 {
+		address = fmt.Sprintf("127.0.0.1:%d", port)
+	}
+
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, 0, fmt.Errorf("listen control api: %w", err)
+	}
+
+	addr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		_ = listener.Close()
+		return nil, 0, fmt.Errorf("resolve control api port: unexpected listener address %T", listener.Addr())
+	}
+
+	return listener, addr.Port, nil
+}
+
 func startControlServer(
+	listener net.Listener,
 	state domain.SchedulerState,
 	requestShutdown func(),
 ) (*http.Server, <-chan error, error) {
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", state.Port))
-	if err != nil {
-		return nil, nil, fmt.Errorf("listen control api: %w", err)
+	if listener == nil {
+		return nil, nil, fmt.Errorf("control api listener is required")
 	}
 
 	mux := http.NewServeMux()

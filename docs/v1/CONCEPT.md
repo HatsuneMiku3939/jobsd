@@ -16,7 +16,7 @@ single shared daemon.
 Each scheduler instance is an independent runtime unit with:
 
 - its own instance name
-- its own port
+- its own loopback control port allocated at startup
 - its own SQLite database
 - its own runtime state files
 
@@ -50,14 +50,15 @@ SQLite is not responsible for process ownership control.
 
 ## Runtime Model
 
-An instance is started with an instance name and a port.
+An instance is started with an instance name.
 When the daemon starts, it:
 
 1. resolves the instance-specific data directory
 2. acquires the instance lock file
 3. opens or creates the instance SQLite database
 4. starts the scheduler loop
-5. exposes management endpoints on the configured port
+5. allocates a free loopback control port and persists it in runtime state
+6. exposes management endpoints on that port
 
 If the lock for the same instance name is already held, startup must fail.
 
@@ -82,7 +83,7 @@ Commands should require the target instance explicitly.
 Examples:
 
 ```bash
-jobsd scheduler start --instance dev --port 8080
+jobsd scheduler start --instance dev
 jobsd scheduler status --instance dev
 jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "..."
 jobsd job list --instance dev

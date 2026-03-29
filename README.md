@@ -38,7 +38,7 @@ jobsd version
 Start a scheduler instance:
 
 ```bash
-jobsd scheduler start --instance dev --port 8080
+jobsd scheduler start --instance dev
 ```
 
 Add a job:
@@ -100,7 +100,7 @@ is queued.
 Scheduler management:
 
 ```bash
-jobsd scheduler start --instance dev --port 8080
+jobsd scheduler start --instance dev
 jobsd scheduler status --instance dev
 jobsd scheduler ping --instance dev
 jobsd scheduler stop --instance dev
@@ -152,7 +152,9 @@ Starting the same instance twice is rejected by the lock layer.
 ## Output and platform behavior
 
 - `jobsd` supports `table` and `json` output modes through `--output`.
-- The scheduler control API binds to `127.0.0.1:<port>`.
+- The scheduler control API binds to an auto-assigned `127.0.0.1:<port>`.
+- The active control port is recorded in `state.json` and shown by
+  `scheduler status` and `scheduler ping`.
 - Unix-like systems execute job commands with `sh -lc`.
 - Windows executes job commands with `cmd /C`.
 - Output capture is stored in SQLite and capped at `64 KiB` per stream.

@@ -20,7 +20,6 @@ import (
 
 func TestServeWritesStateAndMetadata(t *testing.T) {
 	paths := testPaths(t, "dev")
-	port := freePort(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
@@ -28,7 +27,6 @@ func TestServeWritesStateAndMetadata(t *testing.T) {
 	go func() {
 		errCh <- Serve(ctx, ServeOptions{
 			Instance: "dev",
-			Port:     port,
 			Paths:    paths,
 			Version:  "v1.0.0",
 			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -44,8 +42,8 @@ func TestServeWritesStateAndMetadata(t *testing.T) {
 	if state.Instance != "dev" {
 		t.Fatalf("state.Instance = %q, want %q", state.Instance, "dev")
 	}
-	if state.Port != port {
-		t.Fatalf("state.Port = %d, want %d", state.Port, port)
+	if state.Port == 0 {
+		t.Fatal("state.Port = 0, want auto-assigned port")
 	}
 	if state.Token == "" {
 		t.Fatal("state.Token = empty, want non-empty")
@@ -66,8 +64,8 @@ func TestServeWritesStateAndMetadata(t *testing.T) {
 	if meta.InstanceName != "dev" {
 		t.Fatalf("meta.InstanceName = %q, want %q", meta.InstanceName, "dev")
 	}
-	if meta.SchedulerPort != port {
-		t.Fatalf("meta.SchedulerPort = %d, want %d", meta.SchedulerPort, port)
+	if meta.SchedulerPort != state.Port {
+		t.Fatalf("meta.SchedulerPort = %d, want %d", meta.SchedulerPort, state.Port)
 	}
 
 	cancel()
@@ -82,14 +80,12 @@ func TestServeWritesStateAndMetadata(t *testing.T) {
 
 func TestServeControlAPISuccessAndAuthFailures(t *testing.T) {
 	paths := testPaths(t, "dev")
-	port := freePort(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- Serve(ctx, ServeOptions{
 			Instance: "dev",
-			Port:     port,
 			Paths:    paths,
 			Version:  "v1.0.0",
 			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -101,10 +97,10 @@ func TestServeControlAPISuccessAndAuthFailures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadState() error = %v", err)
 	}
-	waitForControlReady(t, port, state.Token)
+	waitForControlReady(t, state.Port, state.Token)
 
 	t.Run("ping success", func(t *testing.T) {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/ping"), nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(state.Port, "/v1/ping"), nil)
 		if err != nil {
 			t.Fatalf("NewRequestWithContext() error = %v", err)
 		}
@@ -130,7 +126,7 @@ func TestServeControlAPISuccessAndAuthFailures(t *testing.T) {
 	})
 
 	t.Run("scheduler success", func(t *testing.T) {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/scheduler"), nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(state.Port, "/v1/scheduler"), nil)
 		if err != nil {
 			t.Fatalf("NewRequestWithContext() error = %v", err)
 		}
@@ -156,7 +152,7 @@ func TestServeControlAPISuccessAndAuthFailures(t *testing.T) {
 	})
 
 	t.Run("missing token", func(t *testing.T) {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/ping"), nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(state.Port, "/v1/ping"), nil)
 		if err != nil {
 			t.Fatalf("NewRequestWithContext() error = %v", err)
 		}
@@ -173,7 +169,7 @@ func TestServeControlAPISuccessAndAuthFailures(t *testing.T) {
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(port, "/v1/ping"), nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, controlURL(state.Port, "/v1/ping"), nil)
 		if err != nil {
 			t.Fatalf("NewRequestWithContext() error = %v", err)
 		}
@@ -198,7 +194,6 @@ func TestServeControlAPISuccessAndAuthFailures(t *testing.T) {
 
 func TestServeShutdownEndpointRemovesState(t *testing.T) {
 	paths := testPaths(t, "dev")
-	port := freePort(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -207,7 +202,6 @@ func TestServeShutdownEndpointRemovesState(t *testing.T) {
 	go func() {
 		errCh <- Serve(ctx, ServeOptions{
 			Instance: "dev",
-			Port:     port,
 			Paths:    paths,
 			Version:  "v1.0.0",
 			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -219,9 +213,9 @@ func TestServeShutdownEndpointRemovesState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadState() error = %v", err)
 	}
-	waitForControlReady(t, port, state.Token)
+	waitForControlReady(t, state.Port, state.Token)
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, controlURL(port, "/v1/scheduler/shutdown"), nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, controlURL(state.Port, "/v1/scheduler/shutdown"), nil)
 	if err != nil {
 		t.Fatalf("NewRequestWithContext() error = %v", err)
 	}

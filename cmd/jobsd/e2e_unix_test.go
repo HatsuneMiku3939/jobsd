@@ -20,13 +20,12 @@ func TestE2EManualWorkflow(t *testing.T) {
 	binaryPath := buildJobsdBinary(t)
 	instance := "e2e-manual"
 	jobName := "manual-workflow"
-	port := freePort(t)
 
 	t.Cleanup(func() {
 		runStopIfRunning(t, binaryPath, instance)
 	})
 
-	startOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", instance, "--port", fmt.Sprintf("%d", port))
+	startOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", instance)
 	if startOut.Status != domain.SchedulerStatusRunning {
 		t.Fatalf("start status = %q, want %q", startOut.Status, domain.SchedulerStatusRunning)
 	}
@@ -115,7 +114,7 @@ func TestE2EAutomaticIntervalExecution(t *testing.T) {
 		runStopIfRunning(t, binaryPath, instance)
 	})
 
-	startSchedulerForE2E(t, binaryPath, instance, freePort(t))
+	startSchedulerForE2E(t, binaryPath, instance)
 
 	runJobsdJSON[jobCommandOutput](
 		t,
@@ -157,7 +156,7 @@ func TestE2EAutomaticCronExecution(t *testing.T) {
 		runStopIfRunning(t, binaryPath, instance)
 	})
 
-	startSchedulerForE2E(t, binaryPath, instance, freePort(t))
+	startSchedulerForE2E(t, binaryPath, instance)
 
 	runJobsdJSON[jobCommandOutput](
 		t,
@@ -199,7 +198,7 @@ func TestE2EOneTimeExecutionDisablesJob(t *testing.T) {
 		runStopIfRunning(t, binaryPath, instance)
 	})
 
-	startSchedulerForE2E(t, binaryPath, instance, freePort(t))
+	startSchedulerForE2E(t, binaryPath, instance)
 
 	runJobsdJSON[jobCommandOutput](
 		t,
@@ -246,15 +245,14 @@ func TestE2EDuplicateStartRejected(t *testing.T) {
 
 	binaryPath := buildJobsdBinary(t)
 	instance := "e2e-duplicate"
-	firstPort := freePort(t)
 
 	t.Cleanup(func() {
 		runStopIfRunning(t, binaryPath, instance)
 	})
 
-	startSchedulerForE2E(t, binaryPath, instance, firstPort)
+	startSchedulerForE2E(t, binaryPath, instance)
 
-	err := runJobsdExpectError(binaryPath, "scheduler", "start", "--instance", instance, "--port", fmt.Sprintf("%d", freePort(t)))
+	err := runJobsdExpectError(binaryPath, "scheduler", "start", "--instance", instance)
 	if err == nil {
 		t.Fatal("duplicate start error = nil, want error")
 	}
@@ -264,10 +262,10 @@ func TestE2EDuplicateStartRejected(t *testing.T) {
 	}
 }
 
-func startSchedulerForE2E(t *testing.T, binaryPath string, instance string, port int) {
+func startSchedulerForE2E(t *testing.T, binaryPath string, instance string) {
 	t.Helper()
 
-	startOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", instance, "--port", fmt.Sprintf("%d", port))
+	startOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", instance)
 	if startOut.Status != domain.SchedulerStatusRunning {
 		t.Fatalf("start status = %q, want %q", startOut.Status, domain.SchedulerStatusRunning)
 	}

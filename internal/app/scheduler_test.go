@@ -5,14 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"path/filepath"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -51,13 +48,8 @@ func TestSchedulerCommandsRequireFlags(t *testing.T) {
 	}{
 		{
 			name: "start missing instance",
-			args: []string{"scheduler", "start", "--port", "8080"},
+			args: []string{"scheduler", "start"},
 			want: `required flag(s) "instance" not set`,
-		},
-		{
-			name: "start missing port",
-			args: []string{"scheduler", "start", "--instance", "dev"},
-			want: `required flag(s) "port" not set`,
 		},
 		{
 			name: "status missing instance",
@@ -113,7 +105,6 @@ func TestSchedulerStartReexecsServeModeAndWaitsForReady(t *testing.T) {
 	schedulerStartupTimeout = 2 * time.Second
 	schedulerPollInterval = 10 * time.Millisecond
 
-	port := freePort(t)
 	var gotExecutable string
 	var gotArgs []string
 	var cancel context.CancelFunc
@@ -123,7 +114,7 @@ func TestSchedulerStartReexecsServeModeAndWaitsForReady(t *testing.T) {
 		gotExecutable = executable
 		gotArgs = append([]string(nil), args...)
 
-		instance, port := parseServeArgs(t, args)
+		instance := parseServeArgs(t, args)
 		paths, err := config.ResolvePaths(instance)
 		if err != nil {
 			t.Fatalf("ResolvePaths() error = %v", err)
@@ -135,7 +126,6 @@ func TestSchedulerStartReexecsServeModeAndWaitsForReady(t *testing.T) {
 		go func() {
 			errCh <- daemon.Serve(serveCtx, daemon.ServeOptions{
 				Instance: instance,
-				Port:     port,
 				Paths:    paths,
 				Version:  "v1.0.0",
 				Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -147,7 +137,7 @@ func TestSchedulerStartReexecsServeModeAndWaitsForReady(t *testing.T) {
 
 	stdout := &bytes.Buffer{}
 	cmd := NewRootCommand(BuildInfo{Version: "v1.0.0"}, stdout, &bytes.Buffer{})
-	cmd.SetArgs([]string{"scheduler", "start", "--instance", "dev", "--port", fmt.Sprintf("%d", port)})
+	cmd.SetArgs([]string{"scheduler", "start", "--instance", "dev"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -156,7 +146,7 @@ func TestSchedulerStartReexecsServeModeAndWaitsForReady(t *testing.T) {
 		t.Fatal("startServeProcess executable = empty, want non-empty")
 	}
 
-	wantArgs := []string{"scheduler", "serve", "--instance", "dev", "--port", fmt.Sprintf("%d", port)}
+	wantArgs := []string{"scheduler", "serve", "--instance", "dev"}
 	if !slices.Equal(gotArgs, wantArgs) {
 		t.Fatalf("startServeProcess args = %#v, want %#v", gotArgs, wantArgs)
 	}
@@ -183,7 +173,7 @@ func TestSchedulerStartSurfacesProcessError(t *testing.T) {
 	}
 
 	cmd := NewRootCommand(BuildInfo{Version: "v1.0.0"}, &bytes.Buffer{}, &bytes.Buffer{})
-	cmd.SetArgs([]string{"scheduler", "start", "--instance", "dev", "--port", "8080"})
+	cmd.SetArgs([]string{"scheduler", "start", "--instance", "dev"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -214,7 +204,7 @@ func TestSchedulerStartTimesOutWhenDaemonNeverBecomesReady(t *testing.T) {
 	}
 
 	cmd := NewRootCommand(BuildInfo{Version: "v1.0.0"}, &bytes.Buffer{}, &bytes.Buffer{})
-	cmd.SetArgs([]string{"scheduler", "start", "--instance", "dev", "--port", "8080"})
+	cmd.SetArgs([]string{"scheduler", "start", "--instance", "dev"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -260,7 +250,7 @@ func TestSchedulerStatusClassifiesRunningStaleAndStopped(t *testing.T) {
 		if err := daemon.WriteState(paths.StatePath, domain.SchedulerState{
 			Instance:  instance,
 			PID:       4242,
-			Port:      freePort(t),
+			Port:      18080,
 			Token:     "stale-token",
 			DBPath:    filepath.Join(paths.DataDir, "jobs.db"),
 			StartedAt: time.Now().UTC(),
@@ -370,7 +360,7 @@ func TestSchedulerHelpIncludesJobsdExamples(t *testing.T) {
 		{
 			name: "scheduler command",
 			args: []string{"scheduler", "--help"},
-			want: "jobsd scheduler start --instance dev --port 8080",
+			want: "jobsd scheduler start --instance dev",
 		},
 		{
 			name: "scheduler ping",
@@ -473,13 +463,11 @@ func startTestDaemon(t *testing.T, instance string) (config.Paths, context.Cance
 	if err != nil {
 		t.Fatalf("ResolvePaths() error = %v", err)
 	}
-	port := freePort(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- daemon.Serve(ctx, daemon.ServeOptions{
 			Instance: instance,
-			Port:     port,
 			Paths:    paths,
 			Version:  "v1.0.0",
 			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -538,47 +526,21 @@ func setTestDirs(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", filepath.Join(baseDir, "runtime"))
 }
 
-func freePort(t *testing.T) int {
-	t.Helper()
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Listen() error = %v", err)
-	}
-	defer listener.Close()
-
-	addr, ok := listener.Addr().(*net.TCPAddr)
-	if !ok {
-		t.Fatalf("Addr() type = %T, want *net.TCPAddr", listener.Addr())
-	}
-
-	return addr.Port
-}
-
-func parseServeArgs(t *testing.T, args []string) (string, int) {
+func parseServeArgs(t *testing.T, args []string) string {
 	t.Helper()
 
 	var instance string
-	var port int
 	for index := 0; index < len(args); index++ {
 		switch args[index] {
 		case "--instance":
 			index++
 			instance = args[index]
-		case "--port":
-			index++
-			value := args[index]
-			parsedPort, err := strconv.Atoi(value)
-			if err != nil {
-				t.Fatalf("Atoi() error = %v", err)
-			}
-			port = parsedPort
 		}
 	}
 
-	if instance == "" || port == 0 {
-		t.Fatalf("args = %#v, want instance and port", args)
+	if instance == "" {
+		t.Fatalf("args = %#v, want instance", args)
 	}
 
-	return instance, port
+	return instance
 }
