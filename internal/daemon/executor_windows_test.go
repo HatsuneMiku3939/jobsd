@@ -3,10 +3,12 @@
 package daemon
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf16"
 )
 
 func TestShellCommandWindows(t *testing.T) {
@@ -92,9 +94,18 @@ func windowsShellQuote(value string) string {
 }
 
 func powershellCommand(script string) string {
-	return "powershell -NoProfile -Command " + windowsShellQuote(script)
+	return "powershell -NoProfile -EncodedCommand " + encodePowerShellScript(script)
 }
 
 func powerShellLiteral(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+func encodePowerShellScript(script string) string {
+	encoded := utf16.Encode([]rune(script))
+	bytes := make([]byte, 0, len(encoded)*2)
+	for _, value := range encoded {
+		bytes = append(bytes, byte(value), byte(value>>8))
+	}
+	return base64.StdEncoding.EncodeToString(bytes)
 }
