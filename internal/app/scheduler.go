@@ -19,7 +19,7 @@ import (
 
 var startServeProcess = func(ctx context.Context, executable string, args []string) error {
 	cmd := exec.CommandContext(ctx, executable, args...)
-	cmd.SysProcAttr = newDetachedSysProcAttr()
+	configureDetachedProcess(cmd)
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	return cmd.Start()

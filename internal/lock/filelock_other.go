@@ -1,4 +1,4 @@
-//go:build !unix
+//go:build !unix && !windows
 
 package lock
 
@@ -7,10 +7,6 @@ import (
 	"os"
 )
 
-func tryLock(file *os.File) error {
-	return fmt.Errorf("file locking is not implemented on this platform")
-}
-
-func unlock(file *os.File) error {
-	return nil
+func openLockedFile(path string) (*os.File, error) {
+	return nil, fmt.Errorf("file locking is not implemented on this platform")
 }

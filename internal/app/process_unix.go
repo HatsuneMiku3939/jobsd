@@ -2,8 +2,11 @@
 
 package app
 
-import "syscall"
+import (
+	"os/exec"
+	"syscall"
+)
 
-func newDetachedSysProcAttr() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{Setsid: true}
+func configureDetachedProcess(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 }

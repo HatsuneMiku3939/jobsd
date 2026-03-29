@@ -9,21 +9,19 @@ import (
 	"syscall"
 )
 
-func tryLock(file *os.File) error {
+func openLockedFile(path string) (*os.File, error) {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open lock file: %w", err)
+	}
+
 	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = file.Close()
 		if errors.Is(err, syscall.EWOULDBLOCK) {
-			return ErrAlreadyLocked
+			return nil, ErrAlreadyLocked
 		}
-		return fmt.Errorf("acquire file lock: %w", err)
+		return nil, fmt.Errorf("acquire file lock: %w", err)
 	}
 
-	return nil
-}
-
-func unlock(file *os.File) error {
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_UN); err != nil {
-		return fmt.Errorf("release file lock: %w", err)
-	}
-
-	return nil
+	return file, nil
 }

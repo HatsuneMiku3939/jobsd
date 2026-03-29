@@ -122,6 +122,8 @@ This package should focus on orchestration, not SQL details.
 Platform-specific daemon launch behavior may live behind small helpers so
 Windows backgrounding can differ internally without changing the public
 CLI contract.
+Signal registration should also remain platform-specific so Windows does
+not depend on Unix-only signals such as `SIGTERM`.
 
 ### `internal/lock`
 
@@ -136,6 +138,9 @@ Responsibilities:
 Keeping this separate makes it easier to test duplicate startup behavior.
 Platform-specific lock implementations are acceptable so long as they
 preserve the same duplicate-start rejection semantics for the caller.
+On Windows, the lock implementation may use an exclusive file handle
+instead of Unix-style `flock`, so long as duplicate startup is rejected
+until the owning process releases the handle.
 
 ### `internal/schedule`
 
