@@ -256,6 +256,84 @@ func TestJobAddDisabledAndOneTimeIntegration(t *testing.T) {
 	}
 }
 
+func TestJobHelpIncludesJobsdExamples(t *testing.T) {
+	setTestDirs(t)
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "job command",
+			args: []string{"job", "--help"},
+			want: "jobsd job list --instance dev",
+		},
+		{
+			name: "job add",
+			args: []string{"job", "add", "--help"},
+			want: "jobsd job add \\",
+		},
+		{
+			name: "job update",
+			args: []string{"job", "update", "--help"},
+			want: "jobsd job update \\",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, err := executeRootCommand(t, tt.args...)
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if !strings.Contains(stdout, tt.want) {
+				t.Fatalf("stdout = %q, want substring %q", stdout, tt.want)
+			}
+		})
+	}
+}
+
+func TestJobTableOutputIsStable(t *testing.T) {
+	setTestDirs(t)
+	setFixedCurrentTime(t, time.Date(2025, 4, 10, 10, 0, 0, 0, time.UTC))
+
+	if _, err := executeRootCommand(
+		t,
+		"job", "add",
+		"--instance", "dev",
+		"--name", "cleanup",
+		"--schedule", "every 10m",
+		"--command", "echo cleanup",
+		"--timezone", "UTC",
+	); err != nil {
+		t.Fatalf("job add error = %v", err)
+	}
+
+	stdout, err := executeRootCommand(t, "job", "get", "--instance", "dev", "--name", "cleanup")
+	if err != nil {
+		t.Fatalf("job get error = %v", err)
+	}
+
+	const want = "" +
+		"FIELD               VALUE\n" +
+		"ID                  1\n" +
+		"NAME                cleanup\n" +
+		"COMMAND             echo cleanup\n" +
+		"SCHEDULE            every 10m\n" +
+		"TIMEZONE            UTC\n" +
+		"ENABLED             true\n" +
+		"CONCURRENCY_POLICY  forbid\n" +
+		"NEXT_RUN_AT         2025-04-10T10:10:00Z\n" +
+		"LAST_RUN_AT         \n" +
+		"LAST_RUN_STATUS     \n" +
+		"CREATED_AT          2025-04-10T10:00:00Z\n" +
+		"UPDATED_AT          2025-04-10T10:00:00Z\n"
+	if stdout != want {
+		t.Fatalf("job get table output = %q, want %q", stdout, want)
+	}
+}
+
 func TestJobUpdatePauseResumeAndRunIntegration(t *testing.T) {
 	setTestDirs(t)
 	setFixedCurrentTime(t, time.Date(2025, 4, 10, 10, 0, 0, 0, time.UTC))

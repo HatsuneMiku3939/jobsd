@@ -40,27 +40,22 @@ func TestRootCommandRejectsInvalidOutputFormat(t *testing.T) {
 	}
 }
 
-func TestPlaceholderCommandsReturnNotImplemented(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-		want string
-	}{
-		{name: "version", args: []string{"version"}, want: "version command is not implemented"},
+func TestRootHelpIncludesJobsdExamples(t *testing.T) {
+	cmd := NewRootCommand(BuildInfo{Version: "v1.0.0"}, &bytes.Buffer{}, &bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd := NewRootCommand(BuildInfo{}, &bytes.Buffer{}, &bytes.Buffer{})
-			cmd.SetArgs(tt.args)
-
-			err := cmd.Execute()
-			if err == nil {
-				t.Fatal("Execute() error = nil, want error")
-			}
-			if err.Error() != tt.want {
-				t.Fatalf("Execute() error = %v, want %q", err, tt.want)
-			}
-		})
+	output := cmd.OutOrStdout().(*bytes.Buffer).String()
+	for _, want := range []string{
+		"jobsd scheduler start --instance dev --port 8080",
+		"jobsd job add --instance dev --name cleanup --schedule \"every 10m\" --command \"echo cleanup\"",
+		"jobsd version",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("help output missing %q: %q", want, output)
+		}
 	}
 }

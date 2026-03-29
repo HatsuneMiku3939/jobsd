@@ -500,6 +500,9 @@ Return:
   - human-readable table output
   - JSON output for scripts
 - Reuse the same DTOs across command handlers where possible.
+- Keep the JSON shape flat for non-list commands.
+- Keep `list` command JSON output as arrays instead of wrapper objects.
+- Use `FIELD VALUE` tables for detail-style human-readable output.
 
 ### 15. Version Reporting
 
@@ -508,6 +511,14 @@ Return:
   - commit
   - build date
 - `jobsd version` prints those values in table or JSON form.
+- JSON keys are:
+  - `version`
+  - `commit`
+  - `build_date`
+- Table field order is:
+  - `VERSION`
+  - `COMMIT`
+  - `BUILD_DATE`
 
 ### 16. Documentation
 
@@ -577,6 +588,7 @@ All code changes must include tests. Favor table-driven tests where practical.
 - Required flag validation
 - JSON output shape
 - Human-readable output smoke tests
+- Stable string assertions for representative table outputs
 - Correct exit codes for success and failure
 - Binary/help text uses `jobsd`
 

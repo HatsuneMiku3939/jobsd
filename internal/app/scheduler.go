@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/hatsunemiku3939/jobsd/internal/config"
@@ -40,6 +41,10 @@ func newSchedulerCommand(info BuildInfo) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scheduler",
 		Short: "Manage scheduler lifecycle commands",
+		Example: strings.TrimSpace(`
+jobsd scheduler start --instance dev --port 8080
+jobsd scheduler status --instance dev
+jobsd scheduler stop --instance dev`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -61,8 +66,9 @@ func newSchedulerStartCommand() *cobra.Command {
 	var port int
 
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start a scheduler daemon for an instance",
+		Use:     "start",
+		Short:   "Start a scheduler daemon for an instance",
+		Example: "jobsd scheduler start --instance dev --port 8080",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths, err := config.ResolvePaths(instance)
 			if err != nil {
@@ -152,8 +158,9 @@ func newSchedulerStatusCommand() *cobra.Command {
 	var instance string
 
 	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Show scheduler status for an instance",
+		Use:     "status",
+		Short:   "Show scheduler status for an instance",
+		Example: "jobsd scheduler status --instance dev",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inspection, err := inspectScheduler(cmd.Context(), instance)
 			if err != nil {
@@ -174,8 +181,9 @@ func newSchedulerStopCommand() *cobra.Command {
 	var instance string
 
 	cmd := &cobra.Command{
-		Use:   "stop",
-		Short: "Stop a scheduler daemon for an instance",
+		Use:     "stop",
+		Short:   "Stop a scheduler daemon for an instance",
+		Example: "jobsd scheduler stop --instance dev",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inspection, err := inspectScheduler(cmd.Context(), instance)
 			if err != nil {
@@ -217,8 +225,9 @@ func newSchedulerPingCommand() *cobra.Command {
 	var instance string
 
 	cmd := &cobra.Command{
-		Use:   "ping",
-		Short: "Check scheduler health for an instance",
+		Use:     "ping",
+		Short:   "Check scheduler health for an instance",
+		Example: "jobsd scheduler ping --instance dev",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inspection, err := inspectScheduler(cmd.Context(), instance)
 			if err != nil {

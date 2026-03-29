@@ -15,6 +15,9 @@ func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Inspect job execution history",
+		Example: strings.TrimSpace(`
+jobsd run list --instance dev
+jobsd run get --instance dev --run-id 123`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -37,8 +40,9 @@ func newRunListCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List recent runs",
+		Use:     "list",
+		Short:   "List recent runs",
+		Example: "jobsd run list --instance dev",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags := cmd.Flags()
 			if flags.Changed("job") && strings.TrimSpace(jobName) == "" {
@@ -102,8 +106,9 @@ func newRunGetCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "get",
-		Short: "Show the details of one run",
+		Use:     "get",
+		Short:   "Show the details of one run",
+		Example: "jobsd run get --instance dev --run-id 123",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runID <= 0 {
 				return fmt.Errorf("run-id must be greater than zero")
@@ -182,27 +187,24 @@ func printRunDetail(cmd *cobra.Command, item runDetailOutput) error {
 		return printer.PrintJSON(item)
 	}
 
-	return printer.PrintTable(
-		[]string{"FIELD", "VALUE"},
-		fieldValueRows(
-			fieldValue{Field: "ID", Value: fmt.Sprintf("%d", item.ID)},
-			fieldValue{Field: "JOB", Value: item.Job},
-			fieldValue{Field: "JOB_ID", Value: fmt.Sprintf("%d", item.JobID)},
-			fieldValue{Field: "TRIGGER_TYPE", Value: item.TriggerType},
-			fieldValue{Field: "STATUS", Value: item.Status},
-			fieldValue{Field: "SCHEDULED_FOR", Value: stringValue(item.ScheduledFor)},
-			fieldValue{Field: "QUEUED_AT", Value: item.QueuedAt},
-			fieldValue{Field: "STARTED_AT", Value: stringValue(item.StartedAt)},
-			fieldValue{Field: "FINISHED_AT", Value: stringValue(item.FinishedAt)},
-			fieldValue{Field: "DURATION", Value: item.Duration},
-			fieldValue{Field: "EXIT_CODE", Value: intPtrString(item.ExitCode)},
-			fieldValue{Field: "ERROR_MESSAGE", Value: stringValue(item.ErrorMessage)},
-			fieldValue{Field: "RUNNER_ID", Value: stringValue(item.RunnerID)},
-			fieldValue{Field: "STDOUT_TRUNCATED", Value: boolString(item.StdoutTruncated)},
-			fieldValue{Field: "STDERR_TRUNCATED", Value: boolString(item.StderrTruncated)},
-			fieldValue{Field: "STDOUT_PREVIEW", Value: item.StdoutPreview},
-			fieldValue{Field: "STDERR_PREVIEW", Value: item.StderrPreview},
-			fieldValue{Field: "OUTPUT_UPDATED_AT", Value: stringValue(item.OutputUpdatedAt)},
-		),
-	)
+	return printer.PrintFields([]output.Field{
+		{Name: "ID", Value: fmt.Sprintf("%d", item.ID)},
+		{Name: "JOB", Value: item.Job},
+		{Name: "JOB_ID", Value: fmt.Sprintf("%d", item.JobID)},
+		{Name: "TRIGGER_TYPE", Value: item.TriggerType},
+		{Name: "STATUS", Value: item.Status},
+		{Name: "SCHEDULED_FOR", Value: stringValue(item.ScheduledFor)},
+		{Name: "QUEUED_AT", Value: item.QueuedAt},
+		{Name: "STARTED_AT", Value: stringValue(item.StartedAt)},
+		{Name: "FINISHED_AT", Value: stringValue(item.FinishedAt)},
+		{Name: "DURATION", Value: item.Duration},
+		{Name: "EXIT_CODE", Value: intPtrString(item.ExitCode)},
+		{Name: "ERROR_MESSAGE", Value: stringValue(item.ErrorMessage)},
+		{Name: "RUNNER_ID", Value: stringValue(item.RunnerID)},
+		{Name: "STDOUT_TRUNCATED", Value: boolString(item.StdoutTruncated)},
+		{Name: "STDERR_TRUNCATED", Value: boolString(item.StderrTruncated)},
+		{Name: "STDOUT_PREVIEW", Value: item.StdoutPreview},
+		{Name: "STDERR_PREVIEW", Value: item.StderrPreview},
+		{Name: "OUTPUT_UPDATED_AT", Value: stringValue(item.OutputUpdatedAt)},
+	})
 }

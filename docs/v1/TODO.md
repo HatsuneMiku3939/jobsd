@@ -217,18 +217,18 @@
 
 ## Phase 17: Output Formatting and UX
 
-- [ ] Finalize human-readable table rendering.
-- [ ] Finalize JSON output payload shapes.
-- [ ] Ensure all help text uses `jobsd`.
-- [ ] Ensure all command examples use `jobsd`.
-- [ ] Add snapshot-like tests or stable string assertions for key command outputs.
+- [x] Finalize human-readable table rendering.
+- [x] Finalize JSON output payload shapes.
+- [x] Ensure all help text uses `jobsd`.
+- [x] Ensure all command examples use `jobsd`.
+- [x] Add snapshot-like tests or stable string assertions for key command outputs.
 
 ## Phase 18: Version Command
 
-- [ ] Implement `version` command output.
-- [ ] Print version, commit, and build date.
-- [ ] Support both table and JSON output modes.
-- [ ] Add tests for version output formatting.
+- [x] Implement `version` command output.
+- [x] Print version, commit, and build date.
+- [x] Support both table and JSON output modes.
+- [x] Add tests for version output formatting.
 
 ## Phase 19: End-to-End Tests
 
