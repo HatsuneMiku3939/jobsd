@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -94,6 +95,10 @@ func TestSchedulerCommandsRequireFlags(t *testing.T) {
 }
 
 func TestSchedulerStartReexecsServeModeAndWaitsForReady(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows lifecycle is covered by cmd/jobsd integration tests")
+	}
+
 	setTestDirs(t)
 
 	originalStartServeProcess := startServeProcess
