@@ -28,8 +28,8 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	if opts.Instance == "" {
 		return fmt.Errorf("instance is required")
 	}
-	if opts.Port <= 0 || opts.Port > 65535 {
-		return fmt.Errorf("port must be between 1 and 65535")
+	if opts.Port < 0 || opts.Port > 65535 {
+		return fmt.Errorf("port must be between 0 and 65535")
 	}
 	if opts.Version == "" {
 		return fmt.Errorf("version is required")
@@ -81,12 +81,23 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		return fmt.Errorf("migrate instance database: %w", err)
 	}
 
-	if err := upsertInstanceMetadata(ctx, sqlite.NewMetadataStore(db), opts.Instance, opts.Port); err != nil {
+	token, err := generateToken()
+	if err != nil {
 		return err
 	}
 
-	token, err := generateToken()
+	listener, port, err := listenControlListener(opts.Port)
 	if err != nil {
+		return err
+	}
+	listenerOpen := true
+	defer func() {
+		if listenerOpen {
+			_ = listener.Close()
+		}
+	}()
+
+	if err := upsertInstanceMetadata(ctx, sqlite.NewMetadataStore(db), opts.Instance, port); err != nil {
 		return err
 	}
 
@@ -94,7 +105,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	state := domain.SchedulerState{
 		Instance:  opts.Instance,
 		PID:       os.Getpid(),
-		Port:      opts.Port,
+		Port:      port,
 		Token:     token,
 		DBPath:    resolvedPaths.DatabasePath,
 		StartedAt: startedAt,
@@ -111,7 +122,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	}()
 
 	shutdownRequested := make(chan struct{}, 1)
-	controlServer, controlErrCh, err := startControlServer(state, func() {
+	controlServer, controlErrCh, err := startControlServer(listener, state, func() {
 		select {
 		case shutdownRequested <- struct{}{}:
 		default:
@@ -120,6 +131,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	if err != nil {
 		return err
 	}
+	listenerOpen = false
 
 	loopCtx, cancelLoop := context.WithCancel(ctx)
 	defer cancelLoop()
@@ -139,7 +151,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 
 	logger.Info("scheduler serve started",
 		slog.String("instance", opts.Instance),
-		slog.Int("port", opts.Port),
+		slog.Int("port", state.Port),
 		slog.String("db_path", resolvedPaths.DatabasePath),
 	)
 

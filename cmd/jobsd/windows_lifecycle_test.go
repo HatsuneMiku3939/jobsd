@@ -20,15 +20,13 @@ func TestWindowsSchedulerLifecycle(t *testing.T) {
 	binaryPath := buildJobsdBinary(t)
 	firstInstance := "win-start-stop"
 	secondInstance := "win-second"
-	firstPort := freePort(t)
-	secondPort := freePort(t)
 
 	t.Cleanup(func() {
 		runStopIfRunning(t, binaryPath, firstInstance)
 		runStopIfRunning(t, binaryPath, secondInstance)
 	})
 
-	startOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", firstInstance, "--port", fmt.Sprintf("%d", firstPort))
+	startOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", firstInstance)
 	if startOut.Status != domain.SchedulerStatusRunning {
 		t.Fatalf("start status = %q, want %q", startOut.Status, domain.SchedulerStatusRunning)
 	}
@@ -49,7 +47,7 @@ func TestWindowsSchedulerLifecycle(t *testing.T) {
 		t.Fatalf("ping status = %q, want %q", pingOut.Status, domain.SchedulerStatusRunning)
 	}
 
-	err = runJobsdExpectError(binaryPath, "scheduler", "start", "--instance", firstInstance, "--port", fmt.Sprintf("%d", freePort(t)))
+	err = runJobsdExpectError(binaryPath, "scheduler", "start", "--instance", firstInstance)
 	if err == nil {
 		t.Fatal("duplicate start error = nil, want error")
 	}
@@ -57,7 +55,7 @@ func TestWindowsSchedulerLifecycle(t *testing.T) {
 		t.Fatalf("duplicate start error = %q, want already running error", got)
 	}
 
-	secondStartOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", secondInstance, "--port", fmt.Sprintf("%d", secondPort))
+	secondStartOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", secondInstance)
 	if secondStartOut.Status != domain.SchedulerStatusRunning {
 		t.Fatalf("second start status = %q, want %q", secondStartOut.Status, domain.SchedulerStatusRunning)
 	}

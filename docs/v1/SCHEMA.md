@@ -155,6 +155,8 @@ Notes:
 
 - do not store lock ownership here
 - do not depend on this table for runtime exclusivity
+- `scheduler_port` stores the most recent loopback control port selected
+  at scheduler startup
 
 ## Recommended Indexes
 

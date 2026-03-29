@@ -21,7 +21,6 @@ Use this checklist when a real end-to-end verification is needed.
 - Choose a fresh instance name for each run, such as `manual-e2e-1`.
 - Use isolated data and runtime directories so existing local instances do
   not interfere.
-- Pick a free local port.
 
 Example setup on Unix-like systems:
 
@@ -29,7 +28,6 @@ Example setup on Unix-like systems:
 export XDG_DATA_HOME="$(mktemp -d)"
 export XDG_RUNTIME_DIR="$(mktemp -d)"
 INSTANCE="manual-e2e-1"
-PORT="18080"
 ./bin/jobsd version
 ```
 
@@ -39,7 +37,6 @@ Example setup on Windows PowerShell:
 $env:XDG_DATA_HOME = Join-Path $env:TEMP ("jobsd-data-" + [guid]::NewGuid())
 $env:XDG_RUNTIME_DIR = Join-Path $env:TEMP ("jobsd-runtime-" + [guid]::NewGuid())
 $INSTANCE = "manual-e2e-1"
-$PORT = "18080"
 .\bin\jobsd.exe version
 ```
 
@@ -47,11 +44,13 @@ $PORT = "18080"
 
 ### 1. Scheduler start
 
-- Run `jobsd scheduler start --instance <instance> --port <port>`.
+- Run `jobsd scheduler start --instance <instance>`.
 - Confirm the command reports `running`.
 - Confirm `jobsd scheduler status --instance <instance>` reports
   `running`.
 - Confirm `jobsd scheduler ping --instance <instance>` succeeds.
+- Confirm the reported port is non-zero and matches the value in the
+  runtime `state.json` file.
 
 ### 2. Manual run workflow
 
@@ -108,7 +107,7 @@ jobsd job add --instance "$INSTANCE" --name once-check --schedule "after 2s" --t
 ### 6. Duplicate start rejection
 
 - While the scheduler is still running, run another
-  `jobsd scheduler start --instance <instance> --port <different-port>`.
+  `jobsd scheduler start --instance <instance>`.
 - Confirm the command fails with an `already running` style error.
 
 ### 7. Shutdown cleanup

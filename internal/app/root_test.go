@@ -50,7 +50,7 @@ func TestRootHelpIncludesJobsdExamples(t *testing.T) {
 
 	output := cmd.OutOrStdout().(*bytes.Buffer).String()
 	for _, want := range []string{
-		"jobsd scheduler start --instance dev --port 8080",
+		"jobsd scheduler start --instance dev",
 		"jobsd job add --instance dev --name cleanup --schedule \"every 10m\" --command \"echo cleanup\"",
 		"jobsd version",
 	} {
