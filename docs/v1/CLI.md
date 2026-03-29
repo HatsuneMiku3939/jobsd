@@ -1,4 +1,4 @@
-# jobs-cli Command Tree
+# jobsd Command Tree
 
 ## Design Goals
 
@@ -15,7 +15,7 @@ The command tree should:
 ## Top-Level Command Structure
 
 ```text
-jobs
+jobsd
 ├── scheduler
 │   ├── start
 │   ├── status
@@ -38,18 +38,18 @@ jobs
 
 ## Command Groups
 
-### `jobs scheduler`
+### `jobsd scheduler`
 
 Manage the lifecycle and health of a scheduler instance.
 
-#### `jobs scheduler start`
+#### `jobsd scheduler start`
 
 Start a scheduler daemon for a specific instance.
 
 Example:
 
 ```bash
-jobs scheduler start --instance dev --port 8080
+jobsd scheduler start --instance dev --port 8080
 ```
 
 Required flags:
@@ -64,14 +64,14 @@ Behavior:
 - acquires the instance lock
 - starts the scheduler loop
 
-#### `jobs scheduler status`
+#### `jobsd scheduler status`
 
 Show the current state of a scheduler instance.
 
 Example:
 
 ```bash
-jobs scheduler status --instance dev
+jobsd scheduler status --instance dev
 ```
 
 Required flags:
@@ -86,14 +86,14 @@ Expected output:
 - process information if available
 - database path
 
-#### `jobs scheduler stop`
+#### `jobsd scheduler stop`
 
 Stop a running scheduler instance.
 
 Example:
 
 ```bash
-jobs scheduler stop --instance dev
+jobsd scheduler stop --instance dev
 ```
 
 Required flags:
@@ -105,14 +105,14 @@ Notes:
 - this command should request graceful shutdown
 - it should fail clearly if the instance is not running
 
-#### `jobs scheduler ping`
+#### `jobsd scheduler ping`
 
 Check whether a scheduler instance is reachable.
 
 Example:
 
 ```bash
-jobs scheduler ping --instance dev
+jobsd scheduler ping --instance dev
 ```
 
 Required flags:
@@ -124,18 +124,18 @@ Notes:
 - useful for scripts and health checks
 - should return a machine-friendly status
 
-### `jobs job`
+### `jobsd job`
 
 Manage job definitions within one instance.
 
-#### `jobs job add`
+#### `jobsd job add`
 
 Create a new scheduled job.
 
 Example:
 
 ```bash
-jobs job add \
+jobsd job add \
   --instance dev \
   --name cleanup \
   --schedule "every 10m" \
@@ -155,14 +155,14 @@ Optional flags:
 - `--disabled`
 - `--concurrency-policy`
 
-#### `jobs job list`
+#### `jobsd job list`
 
 List jobs for one instance.
 
 Example:
 
 ```bash
-jobs job list --instance dev
+jobsd job list --instance dev
 ```
 
 Required flags:
@@ -177,14 +177,14 @@ Useful fields:
 - next run time
 - last run time
 
-#### `jobs job get`
+#### `jobsd job get`
 
 Show the details of one job.
 
 Example:
 
 ```bash
-jobs job get --instance dev --name cleanup
+jobsd job get --instance dev --name cleanup
 ```
 
 Required flags:
@@ -192,14 +192,14 @@ Required flags:
 - `--instance`
 - `--name`
 
-#### `jobs job update`
+#### `jobsd job update`
 
 Update a job definition.
 
 Example:
 
 ```bash
-jobs job update \
+jobsd job update \
   --instance dev \
   --name cleanup \
   --schedule "every 30m"
@@ -214,14 +214,14 @@ Notes:
 
 - only provided fields should be changed
 
-#### `jobs job delete`
+#### `jobsd job delete`
 
 Delete a job definition.
 
 Example:
 
 ```bash
-jobs job delete --instance dev --name cleanup
+jobsd job delete --instance dev --name cleanup
 ```
 
 Required flags:
@@ -229,14 +229,14 @@ Required flags:
 - `--instance`
 - `--name`
 
-#### `jobs job pause`
+#### `jobsd job pause`
 
 Disable scheduled execution for a job without deleting it.
 
 Example:
 
 ```bash
-jobs job pause --instance dev --name cleanup
+jobsd job pause --instance dev --name cleanup
 ```
 
 Required flags:
@@ -244,14 +244,14 @@ Required flags:
 - `--instance`
 - `--name`
 
-#### `jobs job resume`
+#### `jobsd job resume`
 
 Re-enable scheduled execution for a paused job.
 
 Example:
 
 ```bash
-jobs job resume --instance dev --name cleanup
+jobsd job resume --instance dev --name cleanup
 ```
 
 Required flags:
@@ -259,14 +259,14 @@ Required flags:
 - `--instance`
 - `--name`
 
-#### `jobs job run`
+#### `jobsd job run`
 
 Trigger a job immediately.
 
 Example:
 
 ```bash
-jobs job run --instance dev --name cleanup
+jobsd job run --instance dev --name cleanup
 ```
 
 Required flags:
@@ -279,18 +279,18 @@ Notes:
 - this command should create a run record
 - it should not bypass normal execution tracking
 
-### `jobs run`
+### `jobsd run`
 
 Inspect execution history for one instance.
 
-#### `jobs run list`
+#### `jobsd run list`
 
 List recent job runs.
 
 Example:
 
 ```bash
-jobs run list --instance dev
+jobsd run list --instance dev
 ```
 
 Required flags:
@@ -312,14 +312,14 @@ Useful fields:
 - finished time
 - duration
 
-#### `jobs run get`
+#### `jobsd run get`
 
 Show the details of one run.
 
 Example:
 
 ```bash
-jobs run get --instance dev --run-id 123
+jobsd run get --instance dev --run-id 123
 ```
 
 Required flags:
@@ -334,14 +334,14 @@ Useful fields:
 - error message
 - captured output summary
 
-### `jobs version`
+### `jobsd version`
 
 Print the CLI version.
 
 Example:
 
 ```bash
-jobs version
+jobsd version
 ```
 
 ## Global Flag Direction
@@ -363,22 +363,22 @@ configuration.
 The first release should implement this subset first:
 
 ```text
-jobs scheduler start
-jobs scheduler status
-jobs scheduler stop
-jobs job add
-jobs job list
-jobs job get
-jobs job delete
-jobs job pause
-jobs job resume
-jobs job run
-jobs run list
-jobs run get
-jobs version
+jobsd scheduler start
+jobsd scheduler status
+jobsd scheduler stop
+jobsd job add
+jobsd job list
+jobsd job get
+jobsd job delete
+jobsd job pause
+jobsd job resume
+jobsd job run
+jobsd run list
+jobsd run get
+jobsd version
 ```
 
-`jobs job update` and `jobs scheduler ping` can be added early, but they
+`jobsd job update` and `jobsd scheduler ping` can be added early, but they
 are not strictly required for the minimum viable product.
 
 ## Naming Notes
@@ -397,10 +397,10 @@ Why `run` instead of `history`:
 ## Example Workflow
 
 ```bash
-jobs scheduler start --instance dev --port 8080
-jobs job add --instance dev --name cleanup --schedule "every 10m" --command "cleanup-temp-files"
-jobs job list --instance dev
-jobs job run --instance dev --name cleanup
-jobs run list --instance dev
-jobs scheduler stop --instance dev
+jobsd scheduler start --instance dev --port 8080
+jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "cleanup-temp-files"
+jobsd job list --instance dev
+jobsd job run --instance dev --name cleanup
+jobsd run list --instance dev
+jobsd scheduler stop --instance dev
 ```

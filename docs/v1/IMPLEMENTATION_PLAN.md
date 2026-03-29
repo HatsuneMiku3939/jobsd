@@ -86,10 +86,12 @@ and health operations.
 
 Each instance uses isolated persistent and runtime paths.
 
-- Database path: `~/.local/share/jobs-cli/instances/<instance>/jobs.db`
-- Lock file: `${XDG_RUNTIME_DIR}/jobs-cli/<instance>.lock`
-- Runtime directory: `${XDG_RUNTIME_DIR}/jobs-cli/<instance>/`
-- State file: `${XDG_RUNTIME_DIR}/jobs-cli/<instance>/state.json`
+- Database path: `~/.local/share/jobsd/instances/<instance>/jobs.db`
+- Lock file: `${XDG_RUNTIME_DIR}/jobsd/<instance>.lock`
+- Runtime directory: `${XDG_RUNTIME_DIR}/jobsd/<instance>/`
+- State file: `${XDG_RUNTIME_DIR}/jobsd/<instance>/state.json`
+- Runtime fallback without `XDG_RUNTIME_DIR`:
+  `${TMPDIR:-/tmp}/jobsd-<uid>/<instance>/`
 
 The instance name must match `[a-zA-Z0-9._-]+`.
 
@@ -108,7 +110,7 @@ The state file format is fixed to the following fields:
 The implementation follows this structure:
 
 ```text
-jobs-cli/
+jobsd/
 ├── cmd/
 │   └── jobsd/
 │       └── main.go

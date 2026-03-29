@@ -1,4 +1,4 @@
-# jobs-cli Go Package Structure
+# jobsd Go Package Structure
 
 ## Goals
 
@@ -13,9 +13,9 @@ The package structure should:
 ## Recommended Layout
 
 ```text
-jobs-cli/
+jobsd/
 ├── cmd/
-│   └── jobs/
+│   └── jobsd/
 │       └── main.go
 ├── internal/
 │   ├── app/
@@ -54,7 +54,7 @@ jobs-cli/
 
 ## Package Responsibilities
 
-### `cmd/jobs`
+### `cmd/jobsd`
 
 Contains only the binary entrypoint.
 
@@ -278,7 +278,7 @@ The package layout should make these tests natural:
 
 For the first implementation, start with:
 
-- `cmd/jobs`
+- `cmd/jobsd`
 - `internal/app`
 - `internal/config`
 - `internal/daemon`
@@ -294,7 +294,7 @@ be added later.
 
 ### One binary, two roles
 
-Use one `jobs` binary for both:
+Use one `jobsd` binary for both:
 
 - daemon lifecycle commands
 - management commands

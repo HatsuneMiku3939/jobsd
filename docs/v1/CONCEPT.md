@@ -1,8 +1,8 @@
-# jobs-cli Concept
+# jobsd Concept
 
 ## Overview
 
-`jobs-cli` is a local job scheduling system that runs without `cron`.
+`jobsd` is a local job scheduling system that runs without `cron`.
 It consists of:
 
 - a scheduler daemon that runs in the background
@@ -67,9 +67,10 @@ Each instance uses its own automatically managed paths.
 
 Example layout:
 
-- persistent data: `~/.local/share/jobs-cli/instances/<instance>/jobs.db`
-- lock file: `${XDG_RUNTIME_DIR}/jobs-cli/<instance>.lock`
-- runtime files: `${XDG_RUNTIME_DIR}/jobs-cli/<instance>/`
+- persistent data: `~/.local/share/jobsd/instances/<instance>/jobs.db`
+- lock file: `${XDG_RUNTIME_DIR}/jobsd/<instance>.lock`
+- runtime files: `${XDG_RUNTIME_DIR}/jobsd/<instance>/`
+- runtime fallback without `XDG_RUNTIME_DIR`: `${TMPDIR:-/tmp}/jobsd-<uid>/<instance>/`
 
 Persistent data and runtime state must be separated.
 
@@ -81,12 +82,12 @@ Commands should require the target instance explicitly.
 Examples:
 
 ```bash
-jobs scheduler start --instance dev --port 8080
-jobs scheduler status --instance dev
-jobs job add --instance dev --name cleanup --schedule "every 10m" --command "..."
-jobs job list --instance dev
-jobs job run --instance dev --name cleanup
-jobs run list --instance dev
+jobsd scheduler start --instance dev --port 8080
+jobsd scheduler status --instance dev
+jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "..."
+jobsd job list --instance dev
+jobsd job run --instance dev --name cleanup
+jobsd run list --instance dev
 ```
 
 The CLI should not depend on a global instance registry for normal operation.
@@ -115,7 +116,7 @@ The first version does not need to include:
 
 ## Product Positioning
 
-`jobs-cli` can be described as:
+`jobsd` can be described as:
 
 > A local multi-instance job scheduler with isolated SQLite storage per instance.
 

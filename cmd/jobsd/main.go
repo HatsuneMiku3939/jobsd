@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/hatsunemiku3939/jobsd/internal/app"
 	appversion "github.com/hatsunemiku3939/jobsd/version"
 )
 
@@ -13,11 +15,7 @@ var (
 	buildDate = "unknown"
 )
 
-type buildInfo struct {
-	Version   string
-	Commit    string
-	BuildDate string
-}
+type buildInfo = app.BuildInfo
 
 func main() {
 	if err := run(); err != nil {
@@ -27,8 +25,7 @@ func main() {
 }
 
 func run() error {
-	_ = currentBuildInfo()
-	return nil
+	return app.Execute(context.Background(), os.Stdout, os.Stderr, currentBuildInfo())
 }
 
 func currentBuildInfo() buildInfo {

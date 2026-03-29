@@ -18,38 +18,38 @@
 
 ## Phase 1: Core Project Skeleton
 
-- [ ] Create the package directories under `internal/`.
-- [ ] Add empty root command wiring in `internal/app/root.go`.
-- [ ] Add placeholder command files for `scheduler`, `job`, `run`, and `version`.
-- [ ] Add `internal/domain/job.go` with the `Job` type.
-- [ ] Add `internal/domain/run.go` with the `Run` type.
-- [ ] Add `internal/domain/types.go` with shared enums and helper types.
-- [ ] Add `internal/output/printer.go` with table and JSON output scaffolding.
+- [x] Create the package directories under `internal/`.
+- [x] Add empty root command wiring in `internal/app/root.go`.
+- [x] Add placeholder command files for `scheduler`, `job`, `run`, and `version`.
+- [x] Add `internal/domain/job.go` with the `Job` type.
+- [x] Add `internal/domain/run.go` with the `Run` type.
+- [x] Add `internal/domain/types.go` with shared enums and helper types.
+- [x] Add `internal/output/printer.go` with table and JSON output scaffolding.
 
 ## Phase 2: Path and Runtime Layout
 
-- [ ] Implement instance name validation in `internal/config/paths.go`.
-- [ ] Implement data directory resolution for instance databases.
-- [ ] Implement runtime directory resolution for lock and state files.
-- [ ] Implement helper functions for database path, lock path, and state file path.
-- [ ] Add table-driven tests for valid and invalid instance names.
-- [ ] Add tests for XDG path resolution and fallback behavior.
+- [x] Implement instance name validation in `internal/config/paths.go`.
+- [x] Implement data directory resolution for instance databases.
+- [x] Implement runtime directory resolution for lock and state files.
+- [x] Implement helper functions for database path, lock path, and state file path.
+- [x] Add table-driven tests for valid and invalid instance names.
+- [x] Add tests for XDG path resolution and fallback behavior.
 
 ## Phase 3: SQLite Foundation
 
-- [ ] Add `migrations/sqlite/0001_init.sql`.
-- [ ] Create `internal/sqlite/db.go` to open SQLite with the required pragmas.
-- [ ] Create `internal/sqlite/migrate.go` to apply the initial migration.
-- [ ] Ensure migrations are idempotent on repeated startup.
-- [ ] Add integration tests for opening a fresh temporary database.
-- [ ] Add integration tests for migration re-run behavior.
+- [x] Add `migrations/sqlite/0001_init.sql`.
+- [x] Create `internal/sqlite/db.go` to open SQLite with the required pragmas.
+- [x] Create `internal/sqlite/migrate.go` to apply the initial migration.
+- [x] Ensure migrations are idempotent on repeated startup.
+- [x] Add integration tests for opening a fresh temporary database.
+- [x] Add integration tests for migration re-run behavior.
 
 ## Phase 4: Metadata Storage
 
-- [ ] Implement `internal/sqlite/metadata_store.go`.
-- [ ] Add methods to read and write `instance_metadata`.
-- [ ] Persist `instance_name`, `created_at`, and `scheduler_port`.
-- [ ] Add integration tests for metadata upsert and retrieval.
+- [x] Implement `internal/sqlite/metadata_store.go`.
+- [x] Add methods to read and write `instance_metadata`.
+- [x] Persist `instance_name`, `created_at`, and `scheduler_port`.
+- [x] Add integration tests for metadata upsert and retrieval.
 
 ## Phase 5: Job Store
 

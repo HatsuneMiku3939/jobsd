@@ -1,4 +1,4 @@
-# jobs-cli SQLite Schema
+# jobsd SQLite Schema
 
 ## Scope
 
@@ -175,12 +175,12 @@ These indexes optimize:
 ## Initial SQL Draft
 
 ```sql
-CREATE TABLE schema_migrations (
+CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
     applied_at TEXT NOT NULL
 );
 
-CREATE TABLE jobs (
+CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     command TEXT NOT NULL,
@@ -199,7 +199,7 @@ CREATE TABLE jobs (
     CHECK(concurrency_policy IN ('forbid', 'queue', 'replace'))
 );
 
-CREATE TABLE job_runs (
+CREATE TABLE IF NOT EXISTS job_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL,
     trigger_type TEXT NOT NULL,
@@ -216,7 +216,7 @@ CREATE TABLE job_runs (
     CHECK(status IN ('pending', 'running', 'succeeded', 'failed', 'canceled'))
 );
 
-CREATE TABLE job_run_outputs (
+CREATE TABLE IF NOT EXISTS job_run_outputs (
     run_id INTEGER PRIMARY KEY,
     stdout_text TEXT NOT NULL DEFAULT '',
     stderr_text TEXT NOT NULL DEFAULT '',
@@ -228,17 +228,17 @@ CREATE TABLE job_run_outputs (
     CHECK(stderr_truncated IN (0, 1))
 );
 
-CREATE TABLE instance_metadata (
+CREATE TABLE IF NOT EXISTS instance_metadata (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX idx_jobs_name ON jobs(name);
-CREATE INDEX idx_jobs_enabled_next_run_at ON jobs(enabled, next_run_at);
-CREATE INDEX idx_job_runs_job_id_queued_at ON job_runs(job_id, queued_at DESC);
-CREATE INDEX idx_job_runs_status_queued_at ON job_runs(status, queued_at ASC);
-CREATE INDEX idx_job_runs_scheduled_for ON job_runs(scheduled_for);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_name ON jobs(name);
+CREATE INDEX IF NOT EXISTS idx_jobs_enabled_next_run_at ON jobs(enabled, next_run_at);
+CREATE INDEX IF NOT EXISTS idx_job_runs_job_id_queued_at ON job_runs(job_id, queued_at DESC);
+CREATE INDEX IF NOT EXISTS idx_job_runs_status_queued_at ON job_runs(status, queued_at ASC);
+CREATE INDEX IF NOT EXISTS idx_job_runs_scheduled_for ON job_runs(scheduled_for);
 ```
 
 ## Operational Notes
@@ -255,7 +255,7 @@ After queuing a scheduled run, it should recalculate and update the next run tim
 
 ### Manual execution
 
-`jobs job run` should insert a `job_runs` row with:
+`jobsd job run` should insert a `job_runs` row with:
 
 - `trigger_type = 'manual'`
 - `status = 'pending'`
