@@ -237,12 +237,25 @@ These interfaces do not need to be introduced on day one, but they are useful se
 ```go
 type JobStore interface {
     Create(ctx context.Context, job domain.Job) (domain.Job, error)
+    GetByID(ctx context.Context, id int64) (domain.Job, error)
     GetByName(ctx context.Context, name string) (domain.Job, error)
     List(ctx context.Context) ([]domain.Job, error)
     Update(ctx context.Context, job domain.Job) (domain.Job, error)
     DeleteByName(ctx context.Context, name string) error
     ListDue(ctx context.Context, now time.Time) ([]domain.Job, error)
-    UpdateNextRun(ctx context.Context, jobID int64, next time.Time) error
+    UpdateNextRun(
+        ctx context.Context,
+        jobID int64,
+        next *time.Time,
+        updatedAt time.Time,
+    ) error
+    UpdateLastRunSummary(
+        ctx context.Context,
+        jobID int64,
+        lastRunAt *time.Time,
+        lastRunStatus *domain.RunStatus,
+        updatedAt time.Time,
+    ) error
 }
 
 type RunStore interface {
@@ -257,12 +270,18 @@ type RunStore interface {
         scheduledFor time.Time,
         queuedAt time.Time,
     ) (domain.Run, error)
-    ClaimPending(
+    ListPending(
         ctx context.Context,
-        runnerID string,
         limit int,
     ) ([]domain.Run, error)
+    TryClaimPending(
+        ctx context.Context,
+        runID int64,
+        runnerID string,
+    ) (bool, error)
     MarkRunning(ctx context.Context, runID int64, startedAt time.Time) error
+    CancelPendingByJob(ctx context.Context, jobID int64, canceledAt time.Time) error
+    ListUnfinishedByJob(ctx context.Context, jobID int64) ([]domain.Run, error)
     MarkFinished(ctx context.Context, result FinishRunParams) error
     List(ctx context.Context, filter ListRunsFilter) ([]domain.Run, error)
     Get(ctx context.Context, runID int64) (domain.Run, error)
@@ -274,6 +293,13 @@ These interfaces support:
 - CLI-driven job management
 - scheduler-driven due job processing
 - unified handling of scheduled and manual runs
+
+The scheduler loop keeps in-memory execution handles keyed by run ID so it
+can:
+
+- cancel active runs during `replace`
+- cancel all active runs during shutdown
+- serialize active execution per job for the `queue` policy
 
 ## Testing Strategy
 

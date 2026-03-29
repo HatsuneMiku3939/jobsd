@@ -114,6 +114,91 @@ func TestRunStoreClaimPending(t *testing.T) {
 	}
 }
 
+func TestRunStoreListPending(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedTestDB(t)
+	jobStore := NewJobStore(db)
+	runStore := NewRunStore(db)
+
+	job, err := jobStore.Create(ctx, testJob("cleanup"))
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	first, err := runStore.EnqueueManual(ctx, job.ID, time.Date(2025, 4, 10, 10, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("first EnqueueManual() error = %v", err)
+	}
+	second, err := runStore.EnqueueManual(ctx, job.ID, time.Date(2025, 4, 10, 10, 1, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("second EnqueueManual() error = %v", err)
+	}
+	third, err := runStore.EnqueueManual(ctx, job.ID, time.Date(2025, 4, 10, 10, 2, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("third EnqueueManual() error = %v", err)
+	}
+
+	claimed, err := runStore.TryClaimPending(ctx, second.ID, "runner-a")
+	if err != nil {
+		t.Fatalf("TryClaimPending() error = %v", err)
+	}
+	if !claimed {
+		t.Fatal("TryClaimPending() = false, want true")
+	}
+
+	pending, err := runStore.ListPending(ctx, 2)
+	if err != nil {
+		t.Fatalf("ListPending() error = %v", err)
+	}
+
+	if len(pending) != 2 {
+		t.Fatalf("ListPending() length = %d, want 2", len(pending))
+	}
+	if pending[0].ID != first.ID || pending[1].ID != third.ID {
+		t.Fatalf("ListPending() IDs = [%d %d], want [%d %d]", pending[0].ID, pending[1].ID, first.ID, third.ID)
+	}
+}
+
+func TestRunStoreTryClaimPending(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedTestDB(t)
+	jobStore := NewJobStore(db)
+	runStore := NewRunStore(db)
+
+	job, err := jobStore.Create(ctx, testJob("cleanup"))
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	run, err := runStore.EnqueueManual(ctx, job.ID, time.Date(2025, 4, 10, 10, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("EnqueueManual() error = %v", err)
+	}
+
+	firstClaim, err := runStore.TryClaimPending(ctx, run.ID, "runner-a")
+	if err != nil {
+		t.Fatalf("TryClaimPending() first error = %v", err)
+	}
+	if !firstClaim {
+		t.Fatal("TryClaimPending() first = false, want true")
+	}
+
+	secondClaim, err := runStore.TryClaimPending(ctx, run.ID, "runner-b")
+	if err != nil {
+		t.Fatalf("TryClaimPending() second error = %v", err)
+	}
+	if secondClaim {
+		t.Fatal("TryClaimPending() second = true, want false")
+	}
+
+	got, err := runStore.Get(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.RunnerID == nil || *got.RunnerID != "runner-a" {
+		t.Fatalf("RunnerID = %v, want runner-a", got.RunnerID)
+	}
+}
+
 func TestRunStoreMarkRunningAndFinished(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedTestDB(t)
@@ -388,6 +473,73 @@ func TestRunStoreCancelPendingByJob(t *testing.T) {
 	}
 	if stillPending.Status != domain.RunStatusPending {
 		t.Fatalf("otherPending status = %q, want %q", stillPending.Status, domain.RunStatusPending)
+	}
+}
+
+func TestRunStoreListUnfinishedByJob(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedTestDB(t)
+	jobStore := NewJobStore(db)
+	runStore := NewRunStore(db)
+
+	targetJob, err := jobStore.Create(ctx, testJob("cleanup"))
+	if err != nil {
+		t.Fatalf("target Create() error = %v", err)
+	}
+	otherJob, err := jobStore.Create(ctx, testJob("archive"))
+	if err != nil {
+		t.Fatalf("other Create() error = %v", err)
+	}
+
+	pending, err := runStore.EnqueueManual(ctx, targetJob.ID, time.Date(2025, 4, 10, 10, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("pending EnqueueManual() error = %v", err)
+	}
+	running, err := runStore.EnqueueManual(ctx, targetJob.ID, time.Date(2025, 4, 10, 10, 1, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("running EnqueueManual() error = %v", err)
+	}
+	finished, err := runStore.EnqueueManual(ctx, targetJob.ID, time.Date(2025, 4, 10, 10, 2, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("finished EnqueueManual() error = %v", err)
+	}
+	otherPending, err := runStore.EnqueueManual(ctx, otherJob.ID, time.Date(2025, 4, 10, 10, 3, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("otherPending EnqueueManual() error = %v", err)
+	}
+
+	if err := runStore.MarkRunning(ctx, running.ID, time.Date(2025, 4, 10, 10, 4, 0, 0, time.UTC)); err != nil {
+		t.Fatalf("MarkRunning(running) error = %v", err)
+	}
+	if err := runStore.MarkFinished(ctx, FinishRunParams{
+		RunID:      finished.ID,
+		Status:     domain.RunStatusSucceeded,
+		FinishedAt: time.Date(2025, 4, 10, 10, 5, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("MarkFinished() error = %v", err)
+	}
+
+	unfinished, err := runStore.ListUnfinishedByJob(ctx, targetJob.ID)
+	if err != nil {
+		t.Fatalf("ListUnfinishedByJob() error = %v", err)
+	}
+
+	if len(unfinished) != 2 {
+		t.Fatalf("ListUnfinishedByJob() length = %d, want 2", len(unfinished))
+	}
+	if unfinished[0].ID != pending.ID || unfinished[1].ID != running.ID {
+		t.Fatalf("ListUnfinishedByJob() IDs = [%d %d], want [%d %d]", unfinished[0].ID, unfinished[1].ID, pending.ID, running.ID)
+	}
+	if unfinished[0].Status != domain.RunStatusPending || unfinished[1].Status != domain.RunStatusRunning {
+		t.Fatalf("ListUnfinishedByJob() statuses = [%q %q], want [pending running]", unfinished[0].Status, unfinished[1].Status)
+	}
+
+	other, err := runStore.ListUnfinishedByJob(ctx, otherJob.ID)
+	if err != nil {
+		t.Fatalf("ListUnfinishedByJob(other) error = %v", err)
+	}
+	if len(other) != 1 || other[0].ID != otherPending.ID {
+		t.Fatalf("ListUnfinishedByJob(other) = %#v, want [%d]", other, otherPending.ID)
 	}
 }
 

@@ -164,29 +164,29 @@
 
 ## Phase 13: Scheduler Loop
 
-- [ ] Implement the one-second polling loop in `internal/daemon/loop.go`.
-- [ ] Query due jobs using `enabled = 1` and `next_run_at <= now`.
-- [ ] Enqueue scheduled runs.
-- [ ] Recompute and persist `next_run_at` after scheduled enqueue.
-- [ ] For one-time schedules, disable the job after scheduled enqueue.
-- [ ] For one-time schedules, clear `next_run_at` after scheduled enqueue.
-- [ ] Claim pending runs for execution.
-- [ ] Mark claimed runs as running.
-- [ ] Execute claimed runs through the executor.
-- [ ] Persist final run state and outputs.
-- [ ] Update `jobs.last_run_at` and `jobs.last_run_status`.
-- [ ] Add loop tests with fake stores and fake executors.
+- [x] Implement the one-second polling loop in `internal/daemon/loop.go`.
+- [x] Query due jobs using `enabled = 1` and `next_run_at <= now`.
+- [x] Enqueue scheduled runs.
+- [x] Recompute and persist `next_run_at` after scheduled enqueue.
+- [x] For one-time schedules, disable the job after scheduled enqueue.
+- [x] For one-time schedules, clear `next_run_at` after scheduled enqueue.
+- [x] Claim pending runs for execution.
+- [x] Mark claimed runs as running.
+- [x] Execute claimed runs through the executor.
+- [x] Persist final run state and outputs.
+- [x] Update `jobs.last_run_at` and `jobs.last_run_status`.
+- [x] Add loop tests with fake stores and fake executors.
 
 ## Phase 14: Concurrency Policies
 
-- [ ] Implement `forbid` behavior for manual triggers.
-- [ ] Implement `forbid` behavior for scheduled triggers.
-- [ ] Implement `queue` behavior.
-- [ ] Implement cancellation of older pending runs for `replace`.
-- [ ] Track in-memory execution handles for active runs.
-- [ ] Implement replacement of running jobs for `replace`.
-- [ ] Add tests for `forbid`, `queue`, and `replace`.
-- [ ] Add tests for scheduled skip plus next-run recalculation.
+- [x] Implement `forbid` behavior for manual triggers.
+- [x] Implement `forbid` behavior for scheduled triggers.
+- [x] Implement `queue` behavior.
+- [x] Implement cancellation of older pending runs for `replace`.
+- [x] Track in-memory execution handles for active runs.
+- [x] Implement replacement of running jobs for `replace`.
+- [x] Add tests for `forbid`, `queue`, and `replace`.
+- [x] Add tests for scheduled skip plus next-run recalculation.
 
 ## Phase 15: Job Commands
 

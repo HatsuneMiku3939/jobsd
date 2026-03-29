@@ -108,6 +108,30 @@ VALUES (?, ?, ?, ?, ?)
 	return run, nil
 }
 
+func (s *RunStore) ListPending(ctx context.Context, limit int) ([]domain.Run, error) {
+	if limit <= 0 {
+		return []domain.Run{}, nil
+	}
+
+	rows, err := s.db.QueryContext(ctx, runBaseSelect+`
+ WHERE jr.status = ?
+   AND jr.runner_id IS NULL
+ ORDER BY jr.queued_at ASC, jr.id ASC
+ LIMIT ?
+`, string(domain.RunStatusPending), limit)
+	if err != nil {
+		return nil, fmt.Errorf("list pending runs: %w", err)
+	}
+	defer rows.Close()
+
+	runs, err := scanRuns(rows)
+	if err != nil {
+		return nil, fmt.Errorf("list pending runs: %w", err)
+	}
+
+	return runs, nil
+}
+
 func (s *RunStore) ClaimPending(ctx context.Context, runnerID string, limit int) ([]domain.Run, error) {
 	if limit <= 0 {
 		return []domain.Run{}, nil
@@ -170,6 +194,26 @@ WHERE id = ?
 	return claimed, nil
 }
 
+func (s *RunStore) TryClaimPending(ctx context.Context, runID int64, runnerID string) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `
+UPDATE job_runs
+SET runner_id = ?
+WHERE id = ?
+  AND status = ?
+  AND runner_id IS NULL
+`, runnerID, runID, string(domain.RunStatusPending))
+	if err != nil {
+		return false, fmt.Errorf("try claim run %d: %w", runID, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("try claim run %d: read affected rows: %w", runID, err)
+	}
+
+	return rowsAffected > 0, nil
+}
+
 func (s *RunStore) MarkRunning(ctx context.Context, runID int64, startedAt time.Time) error {
 	result, err := s.db.ExecContext(ctx, `
 UPDATE job_runs
@@ -200,6 +244,25 @@ WHERE id = ?
 	}
 
 	return fmt.Errorf("mark run %d running: run is not pending", runID)
+}
+
+func (s *RunStore) ListUnfinishedByJob(ctx context.Context, jobID int64) ([]domain.Run, error) {
+	rows, err := s.db.QueryContext(ctx, runBaseSelect+`
+ WHERE jr.job_id = ?
+   AND jr.status IN (?, ?)
+ ORDER BY jr.queued_at ASC, jr.id ASC
+`, jobID, string(domain.RunStatusPending), string(domain.RunStatusRunning))
+	if err != nil {
+		return nil, fmt.Errorf("list unfinished runs for job %d: %w", jobID, err)
+	}
+	defer rows.Close()
+
+	runs, err := scanRuns(rows)
+	if err != nil {
+		return nil, fmt.Errorf("list unfinished runs for job %d: %w", jobID, err)
+	}
+
+	return runs, nil
 }
 
 func (s *RunStore) MarkFinished(ctx context.Context, params FinishRunParams) error {
