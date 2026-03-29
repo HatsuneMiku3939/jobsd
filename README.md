@@ -1,20 +1,19 @@
 # jobsd
 
-## Project overview
-
 `jobsd` is a local, instance-oriented job scheduler that runs without
 depending on `cron`.
 
-Each scheduler instance owns:
+Each scheduler instance is isolated by name and owns its own SQLite
+database, runtime state, and execution history.
 
-- its own SQLite database
-- its own runtime state files
-- its own lock file
-- its own loopback control API
+## Why jobsd
 
-The CLI always targets a specific instance with `--instance`.
+- Run scheduled jobs without editing system cron tables.
+- Keep environments separate with explicit `--instance` targeting.
+- Store job definitions and run history in SQLite.
+- Manage the scheduler with a local CLI.
 
-## Installation and local build
+## Installation
 
 Build the binary locally:
 
@@ -28,35 +27,105 @@ Install from the current checkout:
 go install ./cmd/jobsd
 ```
 
-Run the full test suite:
+Check the installed version:
 
 ```bash
-make test
+jobsd version
 ```
 
-Run lint checks:
+## Quick start
+
+Start a scheduler instance:
 
 ```bash
-make lint
+jobsd scheduler start --instance dev --port 8080
 ```
 
-## Build metadata / version injection
-
-`jobsd version` prints the build version, commit, and build date.
-
-Build with explicit metadata:
+Add a job:
 
 ```bash
-go build -ldflags "-X main.version=v1.0.0 -X main.commit=abc1234 -X main.buildDate=2025-03-29T00:00:00Z" -o ./bin/jobsd ./cmd/jobsd
+jobsd job add \
+  --instance dev \
+  --name cleanup \
+  --schedule "every 10m" \
+  --command "echo cleanup"
 ```
 
-If no values are injected, the binary falls back to the package version
-and uses `unknown` for missing commit or build date values.
+List jobs:
 
-## Instance model and storage layout
+```bash
+jobsd job list --instance dev
+```
 
-Each instance is isolated by name. Starting the same instance twice is
-rejected by the lock layer.
+Trigger a manual run:
+
+```bash
+jobsd job run --instance dev --name cleanup
+```
+
+Inspect run history:
+
+```bash
+jobsd run list --instance dev
+jobsd run get --instance dev --run-id 1
+```
+
+Stop the scheduler:
+
+```bash
+jobsd scheduler stop --instance dev
+```
+
+## Schedule syntax
+
+`jobsd` supports three schedule forms:
+
+- `every <duration>` for recurring interval schedules
+- `cron <five-field expr>` for cron schedules
+- `after <duration>` for one-time schedules
+
+Examples:
+
+```bash
+jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "echo cleanup"
+jobsd job add --instance dev --name report --schedule "cron 0 * * * *" --timezone UTC --command "echo report"
+jobsd job add --instance dev --name bootstrap --schedule "after 30s" --command "echo bootstrap"
+```
+
+One-time schedules are disabled automatically after their scheduled run
+is queued.
+
+## Common commands
+
+Scheduler management:
+
+```bash
+jobsd scheduler start --instance dev --port 8080
+jobsd scheduler status --instance dev
+jobsd scheduler ping --instance dev
+jobsd scheduler stop --instance dev
+```
+
+Job management:
+
+```bash
+jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "echo cleanup"
+jobsd job list --instance dev
+jobsd job get --instance dev --name cleanup
+jobsd job update --instance dev --name cleanup --schedule "every 30m"
+jobsd job pause --instance dev --name cleanup
+jobsd job resume --instance dev --name cleanup
+jobsd job delete --instance dev --name cleanup
+```
+
+Run inspection:
+
+```bash
+jobsd run list --instance dev
+jobsd run get --instance dev --run-id 1
+```
+
+## Instance storage
 
 Persistent data:
 
@@ -78,95 +147,20 @@ ${TMPDIR:-/tmp}/jobsd-<uid>/<instance>.lock
 ${TMPDIR:-/tmp}/jobsd-<uid>/<instance>/state.json
 ```
 
-The state file includes:
+Starting the same instance twice is rejected by the lock layer.
 
-- `instance`
-- `pid`
-- `port`
-- `token`
-- `db_path`
-- `started_at`
-- `version`
+## Output and platform behavior
 
-## Schedule grammar
-
-Supported schedule forms:
-
-- `every <duration>` for recurring interval schedules
-- `cron <five-field expr>` for cron schedules
-- `after <duration>` for one-time schedules
-
-Examples:
-
-```bash
-jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "echo cleanup"
-jobsd job add --instance dev --name report --schedule "cron 0 * * * *" --timezone UTC --command "echo report"
-jobsd job add --instance dev --name bootstrap --schedule "after 30s" --command "echo bootstrap"
-```
-
-One-time schedules run once through the normal scheduler path and are
-disabled automatically after the scheduled execution is queued.
-
-## Common workflows
-
-Start a scheduler:
-
-```bash
-jobsd scheduler start --instance dev --port 8080
-jobsd scheduler status --instance dev
-jobsd scheduler ping --instance dev
-```
-
-Create and inspect jobs:
-
-```bash
-jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "echo cleanup"
-jobsd job list --instance dev
-jobsd job get --instance dev --name cleanup
-jobsd job pause --instance dev --name cleanup
-jobsd job resume --instance dev --name cleanup
-```
-
-Trigger a manual run and inspect history:
-
-```bash
-jobsd job run --instance dev --name cleanup
-jobsd run list --instance dev
-jobsd run get --instance dev --run-id 1
-```
-
-Print version information:
-
-```bash
-jobsd version
-jobsd --output json version
-```
-
-Stop a scheduler:
-
-```bash
-jobsd scheduler stop --instance dev
-```
-
-## Testing and linting
-
-Repository commands:
-
-```bash
-make test
-make lint
-```
-
-The test suite includes:
-
-- unit tests
-- integration tests against temporary SQLite databases
-- end-to-end CLI tests that build and execute the real `jobsd` binary
-- Windows lifecycle verification for detached daemon behavior
-
-## Platform notes
-
+- `jobsd` supports `table` and `json` output modes through `--output`.
+- The scheduler control API binds to `127.0.0.1:<port>`.
 - Unix-like systems execute job commands with `sh -lc`.
 - Windows executes job commands with `cmd /C`.
-- The scheduler control API binds to `127.0.0.1:<port>`.
 - Output capture is stored in SQLite and capped at `64 KiB` per stream.
+
+## Additional documentation
+
+Design and internal reference documents are available in:
+
+- `docs/v1/CONCEPT.md`
+- `docs/v1/ARCHITECTURE.md`
+- `docs/v1/SCHEMA.md`
