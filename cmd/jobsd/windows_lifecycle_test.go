@@ -4,7 +4,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -58,7 +57,7 @@ func TestWindowsSchedulerLifecycle(t *testing.T) {
 		t.Fatalf("duplicate start error = %q, want already running error", got)
 	}
 
-	secondStartOut := runJobsdJSON(t, binaryPath, "scheduler", "start", "--instance", secondInstance, "--port", fmt.Sprintf("%d", secondPort))
+	secondStartOut := runJobsdJSON[schedulerCommandOutput](t, binaryPath, "scheduler", "start", "--instance", secondInstance, "--port", fmt.Sprintf("%d", secondPort))
 	if secondStartOut.Status != domain.SchedulerStatusRunning {
 		t.Fatalf("second start status = %q, want %q", secondStartOut.Status, domain.SchedulerStatusRunning)
 	}
