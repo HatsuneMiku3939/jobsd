@@ -29,6 +29,11 @@ type Printer struct {
 	format Format
 }
 
+type Field struct {
+	Name  string
+	Value string
+}
+
 func New(writer io.Writer, format Format) *Printer {
 	return &Printer{
 		writer: writer,
@@ -58,6 +63,15 @@ func (p *Printer) PrintTable(headers []string, rows [][]string) error {
 	}
 
 	return writer.Flush()
+}
+
+func (p *Printer) PrintFields(fields []Field) error {
+	rows := make([][]string, 0, len(fields))
+	for _, field := range fields {
+		rows = append(rows, []string{field.Name, field.Value})
+	}
+
+	return p.PrintTable([]string{"FIELD", "VALUE"}, rows)
 }
 
 func writeRow(writer io.Writer, columns []string) error {

@@ -239,6 +239,118 @@ func TestRunCommandsIntegration(t *testing.T) {
 	}
 }
 
+func TestRunHelpIncludesJobsdExamples(t *testing.T) {
+	setTestDirs(t)
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "run command",
+			args: []string{"run", "--help"},
+			want: "jobsd run list --instance dev",
+		},
+		{
+			name: "run get",
+			args: []string{"run", "get", "--help"},
+			want: "jobsd run get --instance dev --run-id 123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, err := executeRootCommand(t, tt.args...)
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if !strings.Contains(stdout, tt.want) {
+				t.Fatalf("stdout = %q, want substring %q", stdout, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunTableOutputIsStable(t *testing.T) {
+	setTestDirs(t)
+
+	db, cleanup := openInstanceDBForTest(t, "dev")
+	defer cleanup()
+
+	ctx := context.Background()
+	base := time.Date(2025, 4, 10, 10, 0, 0, 0, time.UTC)
+	job, err := db.Jobs.Create(ctx, domain.Job{
+		Name:              "cleanup",
+		Command:           "echo cleanup",
+		ScheduleKind:      domain.ScheduleKindInterval,
+		ScheduleExpr:      "every 10m",
+		Timezone:          "UTC",
+		Enabled:           true,
+		ConcurrencyPolicy: domain.ConcurrencyPolicyQueue,
+		CreatedAt:         base,
+		UpdatedAt:         base,
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	run, err := db.Runs.EnqueueManual(ctx, job.ID, base)
+	if err != nil {
+		t.Fatalf("EnqueueManual() error = %v", err)
+	}
+	if err := db.Runs.MarkRunning(ctx, run.ID, base.Add(1*time.Minute)); err != nil {
+		t.Fatalf("MarkRunning() error = %v", err)
+	}
+	exitCode := 1
+	errorMessage := "command failed"
+	if err := db.Runs.MarkFinished(ctx, sqlite.FinishRunParams{
+		RunID:        run.ID,
+		Status:       domain.RunStatusFailed,
+		FinishedAt:   base.Add(2 * time.Minute),
+		ExitCode:     &exitCode,
+		ErrorMessage: &errorMessage,
+		Output: &domain.RunOutput{
+			Stdout:          "hello\nworld",
+			Stderr:          "boom",
+			StdoutTruncated: false,
+			StderrTruncated: true,
+			UpdatedAt:       base.Add(2 * time.Minute),
+		},
+	}); err != nil {
+		t.Fatalf("MarkFinished() error = %v", err)
+	}
+
+	stdout, err := executeRootCommand(t, "run", "get", "--instance", "dev", "--run-id", int64ToString(run.ID))
+	if err != nil {
+		t.Fatalf("run get error = %v", err)
+	}
+
+	const want = "" +
+		"FIELD              VALUE\n" +
+		"ID                 1\n" +
+		"JOB                cleanup\n" +
+		"JOB_ID             1\n" +
+		"TRIGGER_TYPE       manual\n" +
+		"STATUS             failed\n" +
+		"SCHEDULED_FOR      \n" +
+		"QUEUED_AT          2025-04-10T10:00:00Z\n" +
+		"STARTED_AT         2025-04-10T10:01:00Z\n" +
+		"FINISHED_AT        2025-04-10T10:02:00Z\n" +
+		"DURATION           1m0s\n" +
+		"EXIT_CODE          1\n" +
+		"ERROR_MESSAGE      command failed\n" +
+		"RUNNER_ID          \n" +
+		"STDOUT_TRUNCATED   false\n" +
+		"STDERR_TRUNCATED   true\n" +
+		"STDOUT_PREVIEW     hello\\nworld\n" +
+		"STDERR_PREVIEW     boom\n" +
+		"OUTPUT_UPDATED_AT  2025-04-10T10:02:00Z\n"
+	if stdout != want {
+		t.Fatalf("run get table output = %q, want %q", stdout, want)
+	}
+}
+
 func int64ToString(value int64) string {
 	return strconv.FormatInt(value, 10)
 }

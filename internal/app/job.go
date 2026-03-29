@@ -18,6 +18,10 @@ func newJobCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "job",
 		Short: "Manage jobs within an instance",
+		Example: strings.TrimSpace(`
+jobsd job list --instance dev
+jobsd job get --instance dev --name cleanup
+jobsd job run --instance dev --name cleanup`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -51,6 +55,12 @@ func newJobAddCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Create a new job",
+		Example: strings.TrimSpace(`
+jobsd job add \
+  --instance dev \
+  --name cleanup \
+  --schedule "every 10m" \
+  --command "echo cleanup"`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRequiredValue("name", name); err != nil {
 				return err
@@ -132,8 +142,9 @@ func newJobListCommand() *cobra.Command {
 	var instance string
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List jobs for an instance",
+		Use:     "list",
+		Short:   "List jobs for an instance",
+		Example: "jobsd job list --instance dev",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, cleanup, err := openInstanceDB(cmd.Context(), instance)
 			if err != nil {
@@ -168,8 +179,9 @@ func newJobGetCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "get",
-		Short: "Show the details of one job",
+		Use:     "get",
+		Short:   "Show the details of one job",
+		Example: "jobsd job get --instance dev --name cleanup",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRequiredValue("name", name); err != nil {
 				return err
@@ -214,6 +226,14 @@ func newJobUpdateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update a job definition",
+		Example: strings.TrimSpace(`
+jobsd job update \
+  --instance dev \
+  --name cleanup \
+  --new-name cleanup-nightly \
+  --schedule "every 30m" \
+  --timezone UTC \
+  --concurrency-policy queue`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRequiredValue("name", name); err != nil {
 				return err
@@ -386,8 +406,9 @@ func newJobDeleteCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete a job",
+		Use:     "delete",
+		Short:   "Delete a job",
+		Example: "jobsd job delete --instance dev --name cleanup",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRequiredValue("name", name); err != nil {
 				return err
@@ -425,8 +446,9 @@ func newJobPauseCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "pause",
-		Short: "Disable scheduled execution for a job",
+		Use:     "pause",
+		Short:   "Disable scheduled execution for a job",
+		Example: "jobsd job pause --instance dev --name cleanup",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRequiredValue("name", name); err != nil {
 				return err
@@ -475,8 +497,9 @@ func newJobResumeCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "resume",
-		Short: "Re-enable scheduled execution for a job",
+		Use:     "resume",
+		Short:   "Re-enable scheduled execution for a job",
+		Example: "jobsd job resume --instance dev --name cleanup",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRequiredValue("name", name); err != nil {
 				return err
@@ -533,8 +556,9 @@ func newJobRunCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Trigger a job immediately",
+		Use:     "run",
+		Short:   "Trigger a job immediately",
+		Example: "jobsd job run --instance dev --name cleanup",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRequiredValue("name", name); err != nil {
 				return err
@@ -646,23 +670,20 @@ func printJobDetail(cmd *cobra.Command, item jobDetailOutput) error {
 		return printer.PrintJSON(item)
 	}
 
-	return printer.PrintTable(
-		[]string{"FIELD", "VALUE"},
-		fieldValueRows(
-			fieldValue{Field: "ID", Value: fmt.Sprintf("%d", item.ID)},
-			fieldValue{Field: "NAME", Value: item.Name},
-			fieldValue{Field: "COMMAND", Value: item.Command},
-			fieldValue{Field: "SCHEDULE", Value: item.Schedule},
-			fieldValue{Field: "TIMEZONE", Value: item.Timezone},
-			fieldValue{Field: "ENABLED", Value: boolString(item.Enabled)},
-			fieldValue{Field: "CONCURRENCY_POLICY", Value: item.ConcurrencyPolicy},
-			fieldValue{Field: "NEXT_RUN_AT", Value: stringValue(item.NextRunAt)},
-			fieldValue{Field: "LAST_RUN_AT", Value: stringValue(item.LastRunAt)},
-			fieldValue{Field: "LAST_RUN_STATUS", Value: stringValue(item.LastRunStatus)},
-			fieldValue{Field: "CREATED_AT", Value: item.CreatedAt},
-			fieldValue{Field: "UPDATED_AT", Value: item.UpdatedAt},
-		),
-	)
+	return printer.PrintFields([]output.Field{
+		{Name: "ID", Value: fmt.Sprintf("%d", item.ID)},
+		{Name: "NAME", Value: item.Name},
+		{Name: "COMMAND", Value: item.Command},
+		{Name: "SCHEDULE", Value: item.Schedule},
+		{Name: "TIMEZONE", Value: item.Timezone},
+		{Name: "ENABLED", Value: boolString(item.Enabled)},
+		{Name: "CONCURRENCY_POLICY", Value: item.ConcurrencyPolicy},
+		{Name: "NEXT_RUN_AT", Value: stringValue(item.NextRunAt)},
+		{Name: "LAST_RUN_AT", Value: stringValue(item.LastRunAt)},
+		{Name: "LAST_RUN_STATUS", Value: stringValue(item.LastRunStatus)},
+		{Name: "CREATED_AT", Value: item.CreatedAt},
+		{Name: "UPDATED_AT", Value: item.UpdatedAt},
+	})
 }
 
 func printDeleteResult(cmd *cobra.Command, item deleteResultOutput) error {
@@ -676,13 +697,10 @@ func printDeleteResult(cmd *cobra.Command, item deleteResultOutput) error {
 		return printer.PrintJSON(item)
 	}
 
-	return printer.PrintTable(
-		[]string{"FIELD", "VALUE"},
-		fieldValueRows(
-			fieldValue{Field: "NAME", Value: item.Name},
-			fieldValue{Field: "DELETED", Value: boolString(item.Deleted)},
-		),
-	)
+	return printer.PrintFields([]output.Field{
+		{Name: "NAME", Value: item.Name},
+		{Name: "DELETED", Value: boolString(item.Deleted)},
+	})
 }
 
 func printRunEnqueue(cmd *cobra.Command, item runEnqueueOutput) error {
@@ -696,14 +714,11 @@ func printRunEnqueue(cmd *cobra.Command, item runEnqueueOutput) error {
 		return printer.PrintJSON(item)
 	}
 
-	return printer.PrintTable(
-		[]string{"RUN_ID", "JOB", "STATUS", "TRIGGER_TYPE", "QUEUED_AT"},
-		[][]string{{
-			fmt.Sprintf("%d", item.RunID),
-			item.Job,
-			item.Status,
-			item.TriggerType,
-			item.QueuedAt,
-		}},
-	)
+	return printer.PrintFields([]output.Field{
+		{Name: "RUN_ID", Value: fmt.Sprintf("%d", item.RunID)},
+		{Name: "JOB", Value: item.Job},
+		{Name: "STATUS", Value: item.Status},
+		{Name: "TRIGGER_TYPE", Value: item.TriggerType},
+		{Name: "QUEUED_AT", Value: item.QueuedAt},
+	})
 }

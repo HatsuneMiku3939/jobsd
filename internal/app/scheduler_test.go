@@ -354,6 +354,69 @@ func TestSchedulerPingFailsWhenInstanceIsNotHealthy(t *testing.T) {
 	}
 }
 
+func TestSchedulerHelpIncludesJobsdExamples(t *testing.T) {
+	setTestDirs(t)
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "scheduler command",
+			args: []string{"scheduler", "--help"},
+			want: "jobsd scheduler start --instance dev --port 8080",
+		},
+		{
+			name: "scheduler ping",
+			args: []string{"scheduler", "ping", "--help"},
+			want: "jobsd scheduler ping --instance dev",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, err := executeRootCommand(t, tt.args...)
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if !strings.Contains(stdout, tt.want) {
+				t.Fatalf("stdout = %q, want substring %q", stdout, tt.want)
+			}
+		})
+	}
+}
+
+func TestSchedulerTableOutputIsStable(t *testing.T) {
+	setTestDirs(t)
+
+	instance := "dev"
+	_, cancel, errCh := startTestDaemon(t, instance)
+	defer stopTestDaemon(t, cancel, errCh)
+
+	stdout, err := executeRootCommand(t, "scheduler", "ping", "--instance", instance)
+	if err != nil {
+		t.Fatalf("scheduler ping error = %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSuffix(stdout, "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("scheduler ping output lines = %d, want 2: %q", len(lines), stdout)
+	}
+	headerFields := strings.Fields(lines[0])
+	wantHeaderFields := []string{"INSTANCE", "STATUS", "PID", "PORT", "DB_PATH", "STARTED_AT", "VERSION", "REASON"}
+	if !slices.Equal(headerFields, wantHeaderFields) {
+		t.Fatalf("header fields = %#v, want %#v", headerFields, wantHeaderFields)
+	}
+	rowFields := strings.Fields(lines[1])
+	if len(rowFields) != 6 {
+		t.Fatalf("row fields length = %d, want 6: %#v", len(rowFields), rowFields)
+	}
+	if rowFields[0] != "dev" || rowFields[1] != "running" || rowFields[5] != "v1.0.0" {
+		t.Fatalf("data row fields = %#v", rowFields)
+	}
+}
+
 func TestSchedulerStopShutsDownDaemon(t *testing.T) {
 	setTestDirs(t)
 

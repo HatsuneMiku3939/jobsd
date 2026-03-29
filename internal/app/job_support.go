@@ -94,11 +94,6 @@ type runDetailOutput struct {
 	Output          *runOutputDetail `json:"output"`
 }
 
-type fieldValue struct {
-	Field string
-	Value string
-}
-
 func normalizedTimezone(timezone string) string {
 	if timezone == "" {
 		return "Local"
@@ -163,15 +158,6 @@ func previewOutput(text string, max int) string {
 	}
 
 	return escaped[:max] + "..."
-}
-
-func fieldValueRows(values ...fieldValue) [][]string {
-	rows := make([][]string, 0, len(values))
-	for _, value := range values {
-		rows = append(rows, []string{value.Field, value.Value})
-	}
-
-	return rows
 }
 
 func boolString(value bool) string {

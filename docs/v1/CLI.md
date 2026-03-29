@@ -368,6 +368,18 @@ Example:
 jobsd version
 ```
 
+JSON output fields:
+
+- `version`
+- `commit`
+- `build_date`
+
+Table output fields:
+
+- `VERSION`
+- `COMMIT`
+- `BUILD_DATE`
+
 ## Global Flag Direction
 
 The CLI should keep global flags minimal.
@@ -404,6 +416,14 @@ jobsd version
 
 `jobsd job update` and `jobsd scheduler ping` can be added early, but they
 are not strictly required for the minimum viable product.
+
+## Help and Output Conventions
+
+- Public help examples use the `jobsd` binary name consistently.
+- `list` commands return JSON arrays.
+- Detail, lifecycle, enqueue, and version commands return flat JSON objects.
+- Human-readable list output uses a single uppercase header row.
+- Human-readable detail output uses a `FIELD VALUE` table.
 
 ## Naming Notes
 

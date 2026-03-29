@@ -45,8 +45,9 @@ func TestPrinter(t *testing.T) {
 		if err := printer.PrintJSON(map[string]string{"status": "ok"}); err != nil {
 			t.Fatalf("PrintJSON() error = %v", err)
 		}
-		if !strings.Contains(buffer.String(), "\"status\": \"ok\"") {
-			t.Fatalf("PrintJSON() output = %q", buffer.String())
+		const want = "{\n  \"status\": \"ok\"\n}\n"
+		if got := buffer.String(); got != want {
+			t.Fatalf("PrintJSON() output = %q, want %q", got, want)
 		}
 	})
 
@@ -60,6 +61,23 @@ func TestPrinter(t *testing.T) {
 		output := buffer.String()
 		if !strings.Contains(output, "NAME") || !strings.Contains(output, "demo") {
 			t.Fatalf("PrintTable() output = %q", output)
+		}
+	})
+
+	t.Run("fields", func(t *testing.T) {
+		var buffer bytes.Buffer
+		printer := New(&buffer, FormatTable)
+
+		if err := printer.PrintFields([]Field{
+			{Name: "NAME", Value: "demo"},
+			{Name: "STATE", Value: "ready"},
+		}); err != nil {
+			t.Fatalf("PrintFields() error = %v", err)
+		}
+
+		const want = "FIELD  VALUE\nNAME   demo\nSTATE  ready\n"
+		if got := buffer.String(); got != want {
+			t.Fatalf("PrintFields() output = %q, want %q", got, want)
 		}
 	})
 }

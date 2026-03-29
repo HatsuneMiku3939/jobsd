@@ -10,8 +10,14 @@ import (
 func executeRootCommand(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
+	return executeCommandWithBuildInfo(t, BuildInfo{Version: "v1.0.0"}, args...)
+}
+
+func executeCommandWithBuildInfo(t *testing.T, info BuildInfo, args ...string) (string, error) {
+	t.Helper()
+
 	stdout := &bytes.Buffer{}
-	cmd := NewRootCommand(BuildInfo{Version: "v1.0.0"}, stdout, &bytes.Buffer{})
+	cmd := NewRootCommand(info, stdout, &bytes.Buffer{})
 	cmd.SetArgs(args)
 
 	err := cmd.Execute()
