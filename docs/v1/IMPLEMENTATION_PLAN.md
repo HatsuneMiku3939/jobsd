@@ -576,7 +576,7 @@ All code changes must include tests. Favor table-driven tests where practical.
 - The implementation starts from an empty repository with only planning documents.
 - Unix is the primary target for daemon backgrounding behavior.
 - Windows support keeps the same product shape but may differ internally
-  for shell execution.
+  for shell execution and daemon lifecycle internals.
 - Cron syntax is limited to five fields and excludes seconds.
 - One-time scheduling supports only `after <duration>` in v1.
 - Job CRUD is available even when the daemon is stopped.
@@ -593,9 +593,15 @@ Implement in this order:
 5. schedule parsing and next-run calculation
 6. file locking
 7. daemon serve mode and control API
-8. scheduler loop and executor
-9. CLI command handlers
-10. tests
-11. documentation polish
+8. scheduler lifecycle commands
+8.5 Windows runtime support
+9. scheduler loop and executor
+10. CLI command handlers
+11. tests
+12. documentation polish
 
 This order minimizes rework and keeps early milestones testable.
+Windows runtime support belongs after scheduler lifecycle stabilization so
+that process spawning, lock semantics, and shutdown behavior can align
+with the final serve/status/stop flow before executor-specific Windows
+shell behavior is added.

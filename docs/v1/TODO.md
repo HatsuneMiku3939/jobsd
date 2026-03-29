@@ -135,6 +135,19 @@
 - [ ] Add CLI tests for required flags and output modes.
 - [ ] Add integration tests for start and stop flow.
 
+## Phase 11.5: Windows Runtime Support
+
+- [ ] Define Windows-specific process spawning behavior for `scheduler start`.
+- [ ] Implement Windows-compatible detached/background serve launch.
+- [ ] Implement Windows-specific instance file locking semantics.
+- [ ] Ensure duplicate startup rejection works on Windows.
+- [ ] Ensure independent instances can run concurrently on Windows.
+- [ ] Verify state file lifecycle matches Unix behavior on Windows.
+- [ ] Verify `scheduler stop` can shut down a Windows daemon cleanly.
+- [ ] Add platform-gated tests for Windows lock behavior.
+- [ ] Add platform-gated tests for Windows start/stop lifecycle.
+- [ ] Update architecture and implementation docs with Windows runtime notes.
+
 ## Phase 12: Executor
 
 - [ ] Implement shell command execution for Unix with `sh -lc`.

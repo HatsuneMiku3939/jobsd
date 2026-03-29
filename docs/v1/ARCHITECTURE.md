@@ -119,6 +119,9 @@ Suggested split:
 - `executor.go`: command execution and output capture
 
 This package should focus on orchestration, not SQL details.
+Platform-specific daemon launch behavior may live behind small helpers so
+Windows backgrounding can differ internally without changing the public
+CLI contract.
 
 ### `internal/lock`
 
@@ -131,6 +134,8 @@ Responsibilities:
 - expose a small API for lock ownership
 
 Keeping this separate makes it easier to test duplicate startup behavior.
+Platform-specific lock implementations are acceptable so long as they
+preserve the same duplicate-start rejection semantics for the caller.
 
 ### `internal/schedule`
 
