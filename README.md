@@ -15,16 +15,30 @@ database, runtime state, and execution history.
 
 ## Installation
 
-Build the binary locally:
+Install with Homebrew on macOS:
+
+```bash
+brew tap HatsuneMiku3939/homebrew-tap
+brew install --cask jobsd
+```
+
+Install on Linux or Windows from GitHub Releases:
+
+```text
+https://github.com/HatsuneMiku3939/jobsd/releases
+```
+
+Choose the archive that matches your platform:
+
+- `jobsd_<version>_Linux_x86_64.tar.gz`
+- `jobsd_<version>_Linux_arm64.tar.gz`
+- `jobsd_<version>_Windows_x86_64.zip`
+- `jobsd_<version>_Windows_arm64.zip`
+
+Build from the current checkout:
 
 ```bash
 make build
-```
-
-Install from the current checkout:
-
-```bash
-go install ./cmd/jobsd
 ```
 
 Check the installed version:
@@ -32,6 +46,29 @@ Check the installed version:
 ```bash
 jobsd version
 ```
+
+## Release
+
+Pushing a tag that starts with `v` publishes a GitHub Release through
+GitHub Actions and GoReleaser.
+
+```bash
+git tag v0.9.0
+git push origin v0.9.0
+```
+
+Validate the release configuration locally before pushing a tag:
+
+```bash
+make test
+make lint
+make release-check
+make release-snapshot
+```
+
+To update the Homebrew tap during release, add
+`HOMEBREW_TAP_GITHUB_TOKEN` to the repository secrets with write access
+to `HatsuneMiku3939/homebrew-tap`.
 
 ## Quick start
 

@@ -1,0 +1,55 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: jobsd
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    main: ./cmd/jobsd
+    binary: jobsd
+    ldflags:
+      - -s -w -X github.com/hatsunemiku3939/jobsd/version.Version={{ .Version }} -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.buildDate={{ .CommitDate }}
+
+archives:
+  - id: release-archives
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ title .Os }}_{{ if eq .Arch \"amd64\" }}x86_64{{ else }}{{ .Arch }}{{ end }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+      - goos: darwin
+        formats: [zip]
+    files:
+      - README*
+      - LICENSE*
+
+homebrew_casks:
+  - name: jobsd
+    ids:
+      - release-archives
+    binaries:
+      - jobsd
+    directory: Casks
+    homepage: "https://github.com/HatsuneMiku3939/jobsd"
+    description: "Local, instance-oriented job scheduler backed by SQLite"
+    url:
+      verified: "github.com/HatsuneMiku3939/jobsd/"
+    repository:
+      owner: HatsuneMiku3939
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
+    commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
