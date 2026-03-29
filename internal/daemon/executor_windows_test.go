@@ -3,6 +3,7 @@
 package daemon
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -22,16 +23,62 @@ func TestShellCommandWindows(t *testing.T) {
 func helperCommand(t *testing.T, args ...string) string {
 	t.Helper()
 
-	parts := []string{`set "GO_WANT_EXECUTOR_HELPER=1"`}
-	for index, arg := range args {
-		parts = append(parts, `set "GO_EXECUTOR_ARG`+strconv.Itoa(index)+`=`+arg+`"`)
+	switch args[0] {
+	case "noop":
+		return powershellCommand("exit 0")
+	case "stdout":
+		return powershellCommand(fmt.Sprintf("[Console]::Out.Write(%s)", powerShellLiteral(args[1])))
+	case "stderr":
+		return powershellCommand(fmt.Sprintf("[Console]::Error.Write(%s)", powerShellLiteral(args[1])))
+	case "stdout-repeat":
+		count, err := strconv.Atoi(args[1])
+		if err != nil {
+			t.Fatalf("Atoi() count error = %v", err)
+		}
+		return powershellCommand(fmt.Sprintf("[Console]::Out.Write((%s) * %d)", powerShellLiteral(args[2]), count))
+	case "stderr-repeat":
+		count, err := strconv.Atoi(args[1])
+		if err != nil {
+			t.Fatalf("Atoi() count error = %v", err)
+		}
+		return powershellCommand(fmt.Sprintf("[Console]::Error.Write((%s) * %d)", powerShellLiteral(args[2]), count))
+	case "mixed-repeat":
+		stdoutCount, err := strconv.Atoi(args[1])
+		if err != nil {
+			t.Fatalf("Atoi() stdout count error = %v", err)
+		}
+		stderrCount, err := strconv.Atoi(args[3])
+		if err != nil {
+			t.Fatalf("Atoi() stderr count error = %v", err)
+		}
+		return powershellCommand(fmt.Sprintf(
+			"[Console]::Out.Write((%s) * %d); [Console]::Error.Write((%s) * %d)",
+			powerShellLiteral(args[2]),
+			stdoutCount,
+			powerShellLiteral(args[4]),
+			stderrCount,
+		))
+	case "stderr-exit":
+		return powershellCommand(fmt.Sprintf(
+			"[Console]::Error.Write(%s); exit %s",
+			powerShellLiteral(args[1]),
+			args[2],
+		))
+	case "sleep":
+		delayMS, err := strconv.Atoi(args[1])
+		if err != nil {
+			t.Fatalf("Atoi() delay error = %v", err)
+		}
+		return powershellCommand(fmt.Sprintf(
+			"[Console]::Out.Write(%s); Start-Sleep -Milliseconds %d",
+			powerShellLiteral(args[2]),
+			delayMS,
+		))
+	default:
+		t.Fatalf("unsupported helper mode %q", args[0])
 	}
-	if len(args) > 0 {
-		parts = append(parts, `set "GO_EXECUTOR_MODE=`+args[0]+`"`)
-	}
-	parts = append(parts, windowsShellQuote(testBinaryPath(t))+` `+windowsShellQuote("-test.run=TestExecutorHelperProcess"))
 
-	return strings.Join(parts, " && ")
+	return ""
 }
 
 func testBinaryPath(t *testing.T) string {
@@ -42,4 +89,12 @@ func testBinaryPath(t *testing.T) string {
 func windowsShellQuote(value string) string {
 	replacer := strings.NewReplacer(`^`, `^^`, `&`, `^&`, `|`, `^|`, `<`, `^<`, `>`, `^>`, `"`, `""`)
 	return `"` + replacer.Replace(value) + `"`
+}
+
+func powershellCommand(script string) string {
+	return "powershell -NoProfile -Command " + windowsShellQuote(script)
+}
+
+func powerShellLiteral(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }

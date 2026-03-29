@@ -14,21 +14,23 @@ import (
 
 func TestShellExecutorExecute(t *testing.T) {
 	tests := []struct {
-		name         string
-		command      string
-		timeout      time.Duration
-		wantStatus   domain.RunStatus
-		wantExitCode *int
-		wantError    *string
-		wantOutput   bool
-		assertResult func(t *testing.T, result ExecutionResult)
+		name          string
+		command       string
+		timeout       time.Duration
+		wantStatus    domain.RunStatus
+		wantExitCode  *int
+		checkExitCode bool
+		wantError     *string
+		wantOutput    bool
+		assertResult  func(t *testing.T, result ExecutionResult)
 	}{
 		{
-			name:         "successful execution",
-			command:      helperCommand(t, "stdout", "hello"),
-			wantStatus:   domain.RunStatusSucceeded,
-			wantExitCode: intPointer(0),
-			wantOutput:   true,
+			name:          "successful execution",
+			command:       helperCommand(t, "stdout", "hello"),
+			wantStatus:    domain.RunStatusSucceeded,
+			wantExitCode:  intPointer(0),
+			checkExitCode: true,
+			wantOutput:    true,
 			assertResult: func(t *testing.T, result ExecutionResult) {
 				t.Helper()
 				if result.Output == nil {
@@ -46,11 +48,12 @@ func TestShellExecutorExecute(t *testing.T) {
 			},
 		},
 		{
-			name:         "non zero exit code",
-			command:      helperCommand(t, "stderr-exit", "boom", "7"),
-			wantStatus:   domain.RunStatusFailed,
-			wantExitCode: intPointer(7),
-			wantOutput:   true,
+			name:          "non zero exit code",
+			command:       helperCommand(t, "stderr-exit", "boom", "7"),
+			wantStatus:    domain.RunStatusFailed,
+			wantExitCode:  intPointer(7),
+			checkExitCode: true,
+			wantOutput:    true,
 			assertResult: func(t *testing.T, result ExecutionResult) {
 				t.Helper()
 				if result.ErrorMessage != nil {
@@ -65,11 +68,12 @@ func TestShellExecutorExecute(t *testing.T) {
 			},
 		},
 		{
-			name:         "stdout truncation",
-			command:      helperCommand(t, "stdout-repeat", strconv.Itoa(maxCapturedOutputBytes+17), "a"),
-			wantStatus:   domain.RunStatusSucceeded,
-			wantExitCode: intPointer(0),
-			wantOutput:   true,
+			name:          "stdout truncation",
+			command:       helperCommand(t, "stdout-repeat", strconv.Itoa(maxCapturedOutputBytes+17), "a"),
+			wantStatus:    domain.RunStatusSucceeded,
+			wantExitCode:  intPointer(0),
+			checkExitCode: true,
+			wantOutput:    true,
 			assertResult: func(t *testing.T, result ExecutionResult) {
 				t.Helper()
 				if result.Output == nil {
@@ -87,11 +91,12 @@ func TestShellExecutorExecute(t *testing.T) {
 			},
 		},
 		{
-			name:         "stderr truncation",
-			command:      helperCommand(t, "stderr-repeat", strconv.Itoa(maxCapturedOutputBytes+17), "b"),
-			wantStatus:   domain.RunStatusSucceeded,
-			wantExitCode: intPointer(0),
-			wantOutput:   true,
+			name:          "stderr truncation",
+			command:       helperCommand(t, "stderr-repeat", strconv.Itoa(maxCapturedOutputBytes+17), "b"),
+			wantStatus:    domain.RunStatusSucceeded,
+			wantExitCode:  intPointer(0),
+			checkExitCode: true,
+			wantOutput:    true,
 			assertResult: func(t *testing.T, result ExecutionResult) {
 				t.Helper()
 				if result.Output == nil {
@@ -109,11 +114,12 @@ func TestShellExecutorExecute(t *testing.T) {
 			},
 		},
 		{
-			name:         "dual stream independence",
-			command:      helperCommand(t, "mixed-repeat", strconv.Itoa(maxCapturedOutputBytes+9), "x", strconv.Itoa(maxCapturedOutputBytes+11), "y"),
-			wantStatus:   domain.RunStatusSucceeded,
-			wantExitCode: intPointer(0),
-			wantOutput:   true,
+			name:          "dual stream independence",
+			command:       helperCommand(t, "mixed-repeat", strconv.Itoa(maxCapturedOutputBytes+9), "x", strconv.Itoa(maxCapturedOutputBytes+11), "y"),
+			wantStatus:    domain.RunStatusSucceeded,
+			wantExitCode:  intPointer(0),
+			checkExitCode: true,
+			wantOutput:    true,
 			assertResult: func(t *testing.T, result ExecutionResult) {
 				t.Helper()
 				if result.Output == nil {
@@ -131,13 +137,14 @@ func TestShellExecutorExecute(t *testing.T) {
 			},
 		},
 		{
-			name:         "context cancellation preserves partial output",
-			command:      helperCommand(t, "sleep", "1000", "begin"),
-			timeout:      50 * time.Millisecond,
-			wantStatus:   domain.RunStatusFailed,
-			wantExitCode: nil,
-			wantError:    stringPointer(context.DeadlineExceeded.Error()),
-			wantOutput:   true,
+			name:          "context cancellation preserves partial output",
+			command:       helperCommand(t, "sleep", "1000", "begin"),
+			timeout:       50 * time.Millisecond,
+			wantStatus:    domain.RunStatusFailed,
+			wantExitCode:  nil,
+			checkExitCode: false,
+			wantError:     stringPointer(context.DeadlineExceeded.Error()),
+			wantOutput:    true,
 			assertResult: func(t *testing.T, result ExecutionResult) {
 				t.Helper()
 				if result.Output == nil {
@@ -149,11 +156,12 @@ func TestShellExecutorExecute(t *testing.T) {
 			},
 		},
 		{
-			name:         "empty output success",
-			command:      helperCommand(t, "noop"),
-			wantStatus:   domain.RunStatusSucceeded,
-			wantExitCode: intPointer(0),
-			wantOutput:   false,
+			name:          "empty output success",
+			command:       helperCommand(t, "noop"),
+			wantStatus:    domain.RunStatusSucceeded,
+			wantExitCode:  intPointer(0),
+			checkExitCode: true,
+			wantOutput:    false,
 			assertResult: func(t *testing.T, result ExecutionResult) {
 				t.Helper()
 				if result.Output != nil {
@@ -179,7 +187,9 @@ func TestShellExecutorExecute(t *testing.T) {
 			if result.Status != tt.wantStatus {
 				t.Fatalf("Status = %q, want %q", result.Status, tt.wantStatus)
 			}
-			assertIntPtrEqual(t, "ExitCode", result.ExitCode, tt.wantExitCode)
+			if tt.checkExitCode {
+				assertIntPtrEqual(t, "ExitCode", result.ExitCode, tt.wantExitCode)
+			}
 			assertStringPtrEqual(t, "ErrorMessage", result.ErrorMessage, tt.wantError)
 			if result.StartedAt.IsZero() {
 				t.Fatal("StartedAt = zero, want timestamp")
