@@ -15,6 +15,10 @@ more likely to become flaky in automated CI.
 The default automated test suite should stay stable and deterministic.
 Use this checklist when a real end-to-end verification is needed.
 
+Windows lifecycle end-to-end coverage is intentionally excluded from CI.
+Run the Windows-specific lifecycle checks in this document manually when
+those paths change.
+
 ## Preparation
 
 - Build the binary with `make build`.
