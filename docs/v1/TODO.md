@@ -232,30 +232,30 @@
 
 ## Phase 19: End-to-End Tests
 
-- [ ] Add an end-to-end test for `scheduler start -> job add -> job run
+- [x] Add an end-to-end test for `scheduler start -> job add -> job run
   -> run list -> run get -> scheduler stop`.
-- [ ] Add an end-to-end test for automatic interval execution.
-- [ ] Add an end-to-end test for automatic cron execution.
-- [ ] Add an end-to-end test for one-time execution with automatic disable.
-- [ ] Add an end-to-end test for duplicate start rejection on the same instance.
+- [x] Add an end-to-end test for automatic interval execution.
+- [x] Add an end-to-end test for automatic cron execution.
+- [x] Add an end-to-end test for one-time execution with automatic disable.
+- [x] Add an end-to-end test for duplicate start rejection on the same instance.
 
 ## Phase 20: Documentation and Release Readiness
 
-- [ ] Create `README.md`.
-- [ ] Document installation and build commands.
-- [ ] Document the instance model and storage layout.
-- [ ] Document the supported schedule grammar.
-- [ ] Document common command workflows.
-- [ ] Update `docs/v1/CONCEPT.md` examples to use `jobsd`.
-- [ ] Update `docs/v1/CLI.md` examples to use `jobsd`.
-- [ ] Verify that `docs/v1/ARCHITECTURE.md`, `docs/v1/SCHEMA.md`, and
+- [x] Create `README.md`.
+- [x] Document installation and build commands.
+- [x] Document the instance model and storage layout.
+- [x] Document the supported schedule grammar.
+- [x] Document common command workflows.
+- [x] Update `docs/v1/CONCEPT.md` examples to use `jobsd`.
+- [x] Update `docs/v1/CLI.md` examples to use `jobsd`.
+- [x] Verify that `docs/v1/ARCHITECTURE.md`, `docs/v1/SCHEMA.md`, and
   `docs/v1/IMPLEMENTATION_PLAN.md` still match the implementation.
-- [ ] Add a simple release/build section with version injection guidance.
+- [x] Add a simple release/build section with version injection guidance.
 
 ## Final Verification Checklist
 
-- [ ] `go test ./...` passes.
-- [ ] CLI tests, integration tests, and end-to-end tests all pass.
-- [ ] Manual smoke test works on a clean local instance.
-- [ ] No document still uses the old binary name `jobs`.
-- [ ] The implementation matches the locked decisions in `docs/v1/IMPLEMENTATION_PLAN.md`.
+- [x] `go test ./...` passes.
+- [x] CLI tests, integration tests, and end-to-end tests all pass.
+- [x] Manual smoke test works on a clean local instance.
+- [x] No document still uses the old binary name `jobs`.
+- [x] The implementation matches the locked decisions in `docs/v1/IMPLEMENTATION_PLAN.md`.
