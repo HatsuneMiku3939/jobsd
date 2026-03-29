@@ -46,7 +46,6 @@ func TestPlaceholderCommandsReturnNotImplemented(t *testing.T) {
 		args []string
 		want string
 	}{
-		{name: "scheduler", args: []string{"scheduler"}, want: "scheduler command is not implemented"},
 		{name: "job", args: []string{"job"}, want: "job command is not implemented"},
 		{name: "run", args: []string{"run"}, want: "run command is not implemented"},
 		{name: "version", args: []string{"version"}, want: "version command is not implemented"},

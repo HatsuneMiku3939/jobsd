@@ -84,3 +84,13 @@ type InstanceMetadata struct {
 	CreatedAt     time.Time
 	SchedulerPort int
 }
+
+type SchedulerState struct {
+	Instance  string
+	PID       int
+	Port      int
+	Token     string
+	DBPath    string
+	StartedAt time.Time
+	Version   string
+}

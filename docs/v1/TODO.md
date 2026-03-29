@@ -96,22 +96,22 @@
 
 ## Phase 8: File Locking
 
-- [ ] Implement instance file locking in `internal/lock/filelock.go`.
-- [ ] Ensure lock acquisition fails clearly when the same instance is already running.
-- [ ] Ensure different instances can acquire independent locks.
-- [ ] Add tests for duplicate instance startup rejection.
-- [ ] Add tests for independent instance lock success.
+- [x] Implement instance file locking in `internal/lock/filelock.go`.
+- [x] Ensure lock acquisition fails clearly when the same instance is already running.
+- [x] Ensure different instances can acquire independent locks.
+- [x] Add tests for duplicate instance startup rejection.
+- [x] Add tests for independent instance lock success.
 
 ## Phase 9: Daemon State and Serve Mode
 
-- [ ] Define the runtime state JSON structure.
-- [ ] Implement state file write and read helpers.
-- [ ] Implement the hidden internal `scheduler serve` command.
-- [ ] Re-exec the binary from `scheduler start` into serve mode.
-- [ ] Ensure the child process initializes paths, database, metadata,
+- [x] Define the runtime state JSON structure.
+- [x] Implement state file write and read helpers.
+- [x] Implement the hidden internal `scheduler serve` command.
+- [x] Re-exec the binary from `scheduler start` into serve mode.
+- [x] Ensure the child process initializes paths, database, metadata,
   and lock in the correct order.
-- [ ] Remove the state file during graceful shutdown.
-- [ ] Add tests for state file lifecycle.
+- [x] Remove the state file during graceful shutdown.
+- [x] Add tests for state file lifecycle.
 
 ## Phase 10: Control API
 

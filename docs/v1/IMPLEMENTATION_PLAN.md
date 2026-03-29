@@ -298,6 +298,11 @@ The daemon flow is fixed as follows:
 4. The parent polls `GET /v1/ping` until healthy or timeout.
 5. The parent prints success and exits.
 
+Phase 9 may stage this flow in smaller internal steps.
+In that stage, the daemon may first implement lock acquisition,
+database initialization, metadata persistence, and state file lifecycle
+before the HTTP control server and scheduler loop are attached.
+
 On shutdown, the daemon must:
 
 - stop accepting new work

@@ -54,8 +54,8 @@ An instance is started with an instance name and a port.
 When the daemon starts, it:
 
 1. resolves the instance-specific data directory
-2. opens or creates the instance SQLite database
-3. acquires the instance lock file
+2. acquires the instance lock file
+3. opens or creates the instance SQLite database
 4. starts the scheduler loop
 5. exposes management endpoints on the configured port
 

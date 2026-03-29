@@ -43,7 +43,7 @@ func NewRootCommand(info BuildInfo, stdout, stderr io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&outputFormat, "output", string(output.FormatTable), "Output format: table|json")
 
 	cmd.AddCommand(
-		newSchedulerCommand(),
+		newSchedulerCommand(info),
 		newJobCommand(),
 		newRunCommand(),
 		newVersionCommand(info),
