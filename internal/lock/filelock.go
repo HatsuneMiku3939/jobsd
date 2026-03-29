@@ -19,13 +19,8 @@ func Acquire(path string) (*FileLock, error) {
 		return nil, fmt.Errorf("create lock directory: %w", err)
 	}
 
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := openLockedFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("open lock file: %w", err)
-	}
-
-	if err := tryLock(file); err != nil {
-		_ = file.Close()
 		return nil, err
 	}
 
@@ -38,12 +33,6 @@ func Acquire(path string) (*FileLock, error) {
 func (l *FileLock) Release() error {
 	if l == nil || l.file == nil {
 		return nil
-	}
-
-	if err := unlock(l.file); err != nil {
-		_ = l.file.Close()
-		l.file = nil
-		return fmt.Errorf("unlock %s: %w", l.path, err)
 	}
 
 	if err := l.file.Close(); err != nil {

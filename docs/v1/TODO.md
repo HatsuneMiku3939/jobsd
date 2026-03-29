@@ -137,16 +137,18 @@
 
 ## Phase 11.5: Windows Runtime Support
 
-- [ ] Define Windows-specific process spawning behavior for `scheduler start`.
-- [ ] Implement Windows-compatible detached/background serve launch.
-- [ ] Implement Windows-specific instance file locking semantics.
-- [ ] Ensure duplicate startup rejection works on Windows.
-- [ ] Ensure independent instances can run concurrently on Windows.
-- [ ] Verify state file lifecycle matches Unix behavior on Windows.
-- [ ] Verify `scheduler stop` can shut down a Windows daemon cleanly.
-- [ ] Add platform-gated tests for Windows lock behavior.
-- [ ] Add platform-gated tests for Windows start/stop lifecycle.
-- [ ] Update architecture and implementation docs with Windows runtime notes.
+- [x] Define Windows-specific process spawning behavior for `scheduler start`.
+- [x] Implement Windows-compatible detached/background serve launch.
+- [x] Implement Windows-specific instance file locking semantics.
+- [x] Ensure duplicate startup rejection works on Windows.
+- [x] Ensure independent instances can run concurrently on Windows.
+- [x] Verify state file lifecycle matches Unix behavior on Windows.
+- [x] Verify `scheduler stop` can shut down a Windows daemon cleanly.
+- [x] Add platform-gated tests for Windows lock behavior.
+- [x] Add platform-gated tests for Windows start/stop lifecycle.
+- [x] Add GitHub Actions multi-platform verification for Linux, macOS,
+  and Windows.
+- [x] Update architecture and implementation docs with Windows runtime notes.
 
 ## Phase 12: Executor
 

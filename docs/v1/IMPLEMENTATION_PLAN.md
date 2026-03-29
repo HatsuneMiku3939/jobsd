@@ -570,6 +570,9 @@ All code changes must include tests. Favor table-driven tests where practical.
 - Scheduler lifecycle commands work without a global instance registry.
 - Run history and captured output persist in SQLite.
 - The CLI and documentation consistently use `jobsd`.
+- GitHub Actions validates the project on Linux, macOS, and Windows.
+- Windows lifecycle behavior is verified on a real Windows runner by
+  starting, inspecting, pinging, and stopping a detached daemon.
 
 ## Assumptions and Defaults
 
@@ -577,6 +580,9 @@ All code changes must include tests. Favor table-driven tests where practical.
 - Unix is the primary target for daemon backgrounding behavior.
 - Windows support keeps the same product shape but may differ internally
   for shell execution and daemon lifecycle internals.
+- Windows runtime verification relies on GitHub Actions because detached
+  process behavior and file locking cannot be validated from a Linux-only
+  development environment.
 - Cron syntax is limited to five fields and excludes seconds.
 - One-time scheduling supports only `after <duration>` in v1.
 - Job CRUD is available even when the daemon is stopped.
@@ -605,3 +611,6 @@ Windows runtime support belongs after scheduler lifecycle stabilization so
 that process spawning, lock semantics, and shutdown behavior can align
 with the final serve/status/stop flow before executor-specific Windows
 shell behavior is added.
+The validation for that phase should include a GitHub Actions matrix on
+Linux, macOS, and Windows, with Windows-specific lifecycle tests gated by
+`//go:build windows`.

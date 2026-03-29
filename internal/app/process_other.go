@@ -1,9 +1,9 @@
-//go:build !unix
+//go:build !unix && !windows
 
 package app
 
-import "syscall"
+import "os/exec"
 
-func newDetachedSysProcAttr() *syscall.SysProcAttr {
-	return nil
+func configureDetachedProcess(cmd *exec.Cmd) {
+	cmd.SysProcAttr = nil
 }

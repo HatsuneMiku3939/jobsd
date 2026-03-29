@@ -84,14 +84,26 @@ func ReadState(path string) (domain.SchedulerState, error) {
 }
 
 func RemoveState(path string) error {
-	if err := os.Remove(path); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return fmt.Errorf("remove state file: %w", err)
-	}
+	const (
+		removeRetryInterval = 25 * time.Millisecond
+		removeRetryDeadline = 750 * time.Millisecond
+	)
 
-	return nil
+	deadline := time.Now().Add(removeRetryDeadline)
+	for {
+		if err := os.Remove(path); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			if shouldRetryStateRemove(err) && time.Now().Before(deadline) {
+				time.Sleep(removeRetryInterval)
+				continue
+			}
+			return fmt.Errorf("remove state file: %w", err)
+		}
+
+		return nil
+	}
 }
 
 func marshalSchedulerState(state domain.SchedulerState) ([]byte, error) {

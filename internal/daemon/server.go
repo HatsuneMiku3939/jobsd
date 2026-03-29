@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/hatsunemiku3939/jobsd/internal/config"
@@ -122,7 +121,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		return err
 	}
 
-	signalCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	signalCtx, stop := signal.NotifyContext(ctx, shutdownSignals()...)
 	defer stop()
 
 	logger.Info("scheduler serve started",

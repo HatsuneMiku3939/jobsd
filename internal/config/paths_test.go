@@ -34,6 +34,9 @@ func TestResolvePaths(t *testing.T) {
 	t.Run("falls back to home and temp directories", func(t *testing.T) {
 		homeDir := t.TempDir()
 		t.Setenv("HOME", homeDir)
+		t.Setenv("USERPROFILE", homeDir)
+		t.Setenv("HOMEDRIVE", "")
+		t.Setenv("HOMEPATH", "")
 		t.Setenv("XDG_DATA_HOME", "")
 		t.Setenv("XDG_RUNTIME_DIR", "")
 
