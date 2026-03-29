@@ -87,6 +87,11 @@ an intentional behavioral change.
 - Run `make lint` before handing off or committing.
 - If a change affects platform-specific behavior, update or add the
   relevant platform-gated tests.
+- Prefer stable automated tests over broad but flaky end-to-end coverage.
+- The end-to-end scheduler lifecycle tests under `cmd/jobsd` are opt-in
+  and require the `e2e` build tag.
+- Use `docs/MANUAL_E2E_CHECKLIST.md` when real process-level manual
+  verification is needed.
 
 Current repository commands:
 
@@ -94,6 +99,7 @@ Current repository commands:
 make build
 make test
 make lint
+go test -tags=e2e ./cmd/jobsd
 ```
 
 ## Change checklist
@@ -109,8 +115,8 @@ Before finishing work, make sure that:
 ## Common project-specific pitfalls
 
 - Do not treat `README.md` as an internal design document.
-- Do not assume Linux-only behavior; Windows lifecycle support exists and
-  is tested in CI.
+- Do not assume Linux-only behavior; Windows behavior still matters even
+  when it is not covered by the default automated test suite.
 - Do not bypass the scheduler execution path for manual runs unless the
   user explicitly requests a design change.
 - Do not break instance isolation by introducing shared mutable state
