@@ -53,33 +53,33 @@
 
 ## Phase 5: Job Store
 
-- [ ] Implement `Create` in `internal/sqlite/jobs_store.go`.
-- [ ] Implement `GetByName`.
-- [ ] Implement `List`.
-- [ ] Implement `Update`.
-- [ ] Implement `DeleteByName`.
-- [ ] Implement `ListDue`.
-- [ ] Implement `UpdateNextRun`.
-- [ ] Implement `UpdateLastRunSummary`.
-- [ ] Add integration tests for job CRUD.
-- [ ] Add integration tests for unique job name enforcement.
-- [ ] Add integration tests for due job queries.
+- [x] Implement `Create` in `internal/sqlite/jobs_store.go`.
+- [x] Implement `GetByName`.
+- [x] Implement `List`.
+- [x] Implement `Update`.
+- [x] Implement `DeleteByName`.
+- [x] Implement `ListDue`.
+- [x] Implement `UpdateNextRun`.
+- [x] Implement `UpdateLastRunSummary`.
+- [x] Add integration tests for job CRUD.
+- [x] Add integration tests for unique job name enforcement.
+- [x] Add integration tests for due job queries.
 
 ## Phase 6: Run Store
 
-- [ ] Implement `EnqueueManual` in `internal/sqlite/runs_store.go`.
-- [ ] Implement `EnqueueScheduled`.
-- [ ] Implement `ClaimPending`.
-- [ ] Implement `MarkRunning`.
-- [ ] Implement `MarkFinished`.
-- [ ] Implement `CancelPendingByJob`.
-- [ ] Implement `List`.
-- [ ] Implement `Get`.
-- [ ] Implement output row upsert for `job_run_outputs`.
-- [ ] Add integration tests for manual and scheduled run enqueue.
-- [ ] Add integration tests for run claiming and status transitions.
-- [ ] Add integration tests for output persistence.
-- [ ] Add integration tests for cascade delete from `jobs` to `job_runs` and `job_run_outputs`.
+- [x] Implement `EnqueueManual` in `internal/sqlite/runs_store.go`.
+- [x] Implement `EnqueueScheduled`.
+- [x] Implement `ClaimPending`.
+- [x] Implement `MarkRunning`.
+- [x] Implement `MarkFinished`.
+- [x] Implement `CancelPendingByJob`.
+- [x] Implement `List`.
+- [x] Implement `Get`.
+- [x] Implement output row upsert for `job_run_outputs`.
+- [x] Add integration tests for manual and scheduled run enqueue.
+- [x] Add integration tests for run claiming and status transitions.
+- [x] Add integration tests for output persistence.
+- [x] Add integration tests for cascade delete from `jobs` to `job_runs` and `job_run_outputs`.
 
 ## Phase 7: Schedule Parsing
 
