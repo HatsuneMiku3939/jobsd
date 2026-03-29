@@ -124,8 +124,10 @@ jobsd/
 │   ├── config/
 │   │   └── paths.go
 │   ├── daemon/
-│   │   ├── server.go
+│   │   ├── control.go
 │   │   ├── loop.go
+│   │   ├── server.go
+│   │   ├── state.go
 │   │   └── executor.go
 │   ├── lock/
 │   │   └── filelock.go

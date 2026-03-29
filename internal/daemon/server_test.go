@@ -264,8 +264,13 @@ func TestServeRejectsDuplicateInstance(t *testing.T) {
 	}()
 
 	waitForStateFile(t, paths.StatePath)
+	state, err := ReadState(paths.StatePath)
+	if err != nil {
+		t.Fatalf("ReadState() error = %v", err)
+	}
+	waitForControlReady(t, firstPort, state.Token)
 
-	err := Serve(context.Background(), ServeOptions{
+	err = Serve(context.Background(), ServeOptions{
 		Instance: "dev",
 		Port:     secondPort,
 		Paths:    paths,
@@ -277,6 +282,22 @@ func TestServeRejectsDuplicateInstance(t *testing.T) {
 	}
 	if got, want := err.Error(), `instance "dev" is already running`; got != want {
 		t.Fatalf("Serve() duplicate error = %q, want %q", got, want)
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, controlURL(firstPort, "/v1/scheduler/shutdown"), nil)
+	if err != nil {
+		t.Fatalf("NewRequestWithContext() error = %v", err)
+	}
+	req.Header.Set(jobsTokenHeader, state.Token)
+
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do() error = %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("StatusCode = %d, want %d", response.StatusCode, http.StatusNoContent)
 	}
 
 	cancel()

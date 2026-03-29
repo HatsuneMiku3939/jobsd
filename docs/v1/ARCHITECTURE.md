@@ -27,8 +27,10 @@ jobsd/
 │   ├── config/
 │   │   └── paths.go
 │   ├── daemon/
-│   │   ├── server.go
+│   │   ├── control.go
 │   │   ├── loop.go
+│   │   ├── server.go
+│   │   ├── state.go
 │   │   └── executor.go
 │   ├── lock/
 │   │   └── filelock.go
@@ -114,8 +116,10 @@ Responsibilities:
 
 Suggested split:
 
+- `control.go`: loopback control API and token-authenticated handlers
 - `server.go`: lifecycle orchestration
 - `loop.go`: ticker-driven scheduling loop
+- `state.go`: runtime state file persistence and validation
 - `executor.go`: command execution, output capture, and terminal run results
 
 This package should focus on orchestration, not SQL details.
