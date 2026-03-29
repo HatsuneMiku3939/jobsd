@@ -190,30 +190,30 @@
 
 ## Phase 15: Job Commands
 
-- [ ] Implement `job add`.
-- [ ] Validate required flags and parse schedules before persistence.
-- [ ] Compute initial `next_run_at` unless the job is disabled.
-- [ ] Compute initial `next_run_at` for enabled one-time schedules.
-- [ ] Implement `job list`.
-- [ ] Implement `job get`.
-- [ ] Implement `job update` with partial field updates.
-- [ ] Recompute `next_run_at` when schedule, timezone, or enabled state changes.
-- [ ] Recompute `next_run_at` correctly for one-time schedules on update and resume.
-- [ ] Implement `job delete`.
-- [ ] Implement `job pause`.
-- [ ] Implement `job resume`.
-- [ ] Implement `job run`.
-- [ ] Add CLI tests for all job command validation paths.
-- [ ] Add integration tests for job command behavior against a
+- [x] Implement `job add`.
+- [x] Validate required flags and parse schedules before persistence.
+- [x] Compute initial `next_run_at` unless the job is disabled.
+- [x] Compute initial `next_run_at` for enabled one-time schedules.
+- [x] Implement `job list`.
+- [x] Implement `job get`.
+- [x] Implement `job update` with partial field updates.
+- [x] Recompute `next_run_at` when schedule, timezone, or enabled state changes.
+- [x] Recompute `next_run_at` correctly for one-time schedules on update and resume.
+- [x] Implement `job delete`.
+- [x] Implement `job pause`.
+- [x] Implement `job resume`.
+- [x] Implement `job run`.
+- [x] Add CLI tests for all job command validation paths.
+- [x] Add integration tests for job command behavior against a
   temporary instance database.
 
 ## Phase 16: Run Commands
 
-- [ ] Implement `run list` with `--job`, `--status`, and `--limit`.
-- [ ] Implement `run get`.
-- [ ] Include output truncation metadata in detailed run output.
-- [ ] Add CLI tests for run command validation.
-- [ ] Add integration tests for run list and run get behavior.
+- [x] Implement `run list` with `--job`, `--status`, and `--limit`.
+- [x] Implement `run get`.
+- [x] Include output truncation metadata in detailed run output.
+- [x] Add CLI tests for run command validation.
+- [x] Add integration tests for run list and run get behavior.
 
 ## Phase 17: Output Formatting and UX
 

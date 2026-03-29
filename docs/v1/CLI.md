@@ -208,7 +208,10 @@ Example:
 jobsd job update \
   --instance dev \
   --name cleanup \
-  --schedule "every 30m"
+  --new-name cleanup-nightly \
+  --schedule "every 30m" \
+  --timezone UTC \
+  --concurrency-policy queue
 ```
 
 Required flags:
@@ -219,6 +222,16 @@ Required flags:
 Notes:
 
 - only provided fields should be changed
+- `--new-name` renames the job while `--name` remains the lookup key
+- `--enabled` and `--disabled` are mutually exclusive
+- supported optional update flags are:
+  - `--new-name`
+  - `--command`
+  - `--schedule`
+  - `--timezone`
+  - `--concurrency-policy`
+  - `--enabled`
+  - `--disabled`
 
 #### `jobsd job delete`
 
@@ -309,6 +322,10 @@ Optional flags:
 - `--status`
 - `--limit`
 
+Notes:
+
+- `--limit` defaults to `20`
+
 Useful fields:
 
 - run ID
@@ -339,6 +356,7 @@ Useful fields:
 - exit code
 - error message
 - captured output summary
+- stdout and stderr truncation metadata
 
 ### `jobsd version`
 
