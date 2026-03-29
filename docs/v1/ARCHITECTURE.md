@@ -116,7 +116,7 @@ Suggested split:
 
 - `server.go`: lifecycle orchestration
 - `loop.go`: ticker-driven scheduling loop
-- `executor.go`: command execution and output capture
+- `executor.go`: command execution, output capture, and terminal run results
 
 This package should focus on orchestration, not SQL details.
 Platform-specific daemon launch behavior may live behind small helpers so
