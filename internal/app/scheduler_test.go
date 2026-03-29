@@ -403,11 +403,17 @@ func TestSchedulerTableOutputIsStable(t *testing.T) {
 	if len(lines) != 2 {
 		t.Fatalf("scheduler ping output lines = %d, want 2: %q", len(lines), stdout)
 	}
-	if lines[0] != "INSTANCE  STATUS   PID     PORT   DB_PATH  STARTED_AT            VERSION  REASON" {
-		t.Fatalf("header = %q", lines[0])
+	headerFields := strings.Fields(lines[0])
+	wantHeaderFields := []string{"INSTANCE", "STATUS", "PID", "PORT", "DB_PATH", "STARTED_AT", "VERSION", "REASON"}
+	if !slices.Equal(headerFields, wantHeaderFields) {
+		t.Fatalf("header fields = %#v, want %#v", headerFields, wantHeaderFields)
 	}
-	if !strings.Contains(lines[1], "dev") || !strings.Contains(lines[1], "running") || !strings.Contains(lines[1], "v1.0.0") {
-		t.Fatalf("data row = %q", lines[1])
+	rowFields := strings.Fields(lines[1])
+	if len(rowFields) != 6 {
+		t.Fatalf("row fields length = %d, want 6: %#v", len(rowFields), rowFields)
+	}
+	if rowFields[0] != "dev" || rowFields[1] != "running" || rowFields[5] != "v1.0.0" {
+		t.Fatalf("data row fields = %#v", rowFields)
 	}
 }
 
