@@ -358,6 +358,8 @@ The loop runs every second and performs the following steps:
 - Capture stdout and stderr independently.
 - Limit each output stream to `64 KiB`.
 - Set truncation flags when the limit is exceeded.
+- Return a terminal execution result object so the scheduler loop can map
+  it directly into run completion persistence.
 - Persist:
   - final status
   - exit code

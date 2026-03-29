@@ -152,15 +152,15 @@
 
 ## Phase 12: Executor
 
-- [ ] Implement shell command execution for Unix with `sh -lc`.
-- [ ] Implement shell command execution for Windows with `cmd /C`.
-- [ ] Capture stdout and stderr separately.
-- [ ] Enforce a `64 KiB` cap per output stream.
-- [ ] Mark truncation flags when output is cut off.
-- [ ] Return exit code and execution error details.
-- [ ] Add tests for successful execution.
-- [ ] Add tests for non-zero exit code handling.
-- [ ] Add tests for stdout and stderr truncation.
+- [x] Implement shell command execution for Unix with `sh -lc`.
+- [x] Implement shell command execution for Windows with `cmd /C`.
+- [x] Capture stdout and stderr separately.
+- [x] Enforce a `64 KiB` cap per output stream.
+- [x] Mark truncation flags when output is cut off.
+- [x] Return exit code and execution error details.
+- [x] Add tests for successful execution.
+- [x] Add tests for non-zero exit code handling.
+- [x] Add tests for stdout and stderr truncation.
 
 ## Phase 13: Scheduler Loop
 
