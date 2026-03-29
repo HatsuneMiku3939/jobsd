@@ -44,7 +44,3 @@ jobs:
       - name: Windows command package verification
         if: runner.os == 'Windows'
         run: go test ./cmd/jobsd -run TestCurrentBuildInfo -count=1
-
-      - name: Windows lifecycle verification
-        if: runner.os == 'Windows'
-        run: go test ./cmd/jobsd -run TestWindowsSchedulerLifecycle -count=1

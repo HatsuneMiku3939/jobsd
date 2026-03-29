@@ -164,3 +164,4 @@ Design and internal reference documents are available in:
 - `docs/v1/CONCEPT.md`
 - `docs/v1/ARCHITECTURE.md`
 - `docs/v1/SCHEMA.md`
+- `docs/MANUAL_E2E_CHECKLIST.md`
