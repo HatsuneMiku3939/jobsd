@@ -121,6 +121,19 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		return err
 	}
 
+	loopCtx, cancelLoop := context.WithCancel(ctx)
+	defer cancelLoop()
+
+	loopErrCh := make(chan error, 1)
+	go func() {
+		loopErrCh <- (&Loop{
+			JobStore: sqlite.NewJobStore(db),
+			RunStore: sqlite.NewRunStore(db),
+			Executor: ShellExecutor{},
+			Logger:   logger,
+		}).Run(loopCtx)
+	}()
+
 	signalCtx, stop := signal.NotifyContext(ctx, shutdownSignals()...)
 	defer stop()
 
@@ -138,6 +151,11 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 			return err
 		}
 		return fmt.Errorf("control api stopped unexpectedly")
+	case err := <-loopErrCh:
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("scheduler loop stopped unexpectedly")
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -145,7 +163,11 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	if err := shutdownControlServer(shutdownCtx, controlServer); err != nil {
 		return err
 	}
+	cancelLoop()
 	if err := <-controlErrCh; err != nil {
+		return err
+	}
+	if err := <-loopErrCh; err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 	if err := RemoveState(resolvedPaths.StatePath); err != nil {

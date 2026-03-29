@@ -350,6 +350,22 @@ The loop runs every second and performs the following steps:
 8. Persist completion state and captured output.
 9. Update denormalized job summary fields.
 
+Additional loop rules for v1:
+
+- Recalculate `next_run_at` from the previous due time, not from wall-clock
+  `now`.
+- If the schedule is behind, keep advancing until the next value is strictly
+  in the future instead of backfilling every missed occurrence.
+- One-time schedules are consumed at decision time:
+  - scheduled enqueue disables the job and clears `next_run_at`
+  - scheduled `forbid` skip also disables the job and clears `next_run_at`
+- Pending runs are claimed with a lightweight compare-and-set flow:
+  - list pending runs without a `runner_id`
+  - try to claim each run for the current loop
+  - mark successfully claimed runs as `running`
+- Active executions are tracked in memory so replacement and shutdown can
+  cancel them cleanly.
+
 ### 10. Implement the Executor
 
 - Use shell execution:
@@ -376,10 +392,14 @@ The policy behavior is fixed and must not be reinterpreted during implementation
   - manual trigger returns a conflict error
   - scheduled trigger is skipped
 - Scheduled skip still recomputes the next schedule.
+- For one-time schedules, scheduled skip still consumes the one allowed run
+  and disables the job.
 
 #### `queue`
 
 - Always enqueue a new `pending` run.
+- Execute at most one active run per job at a time.
+- Additional queued runs stay `pending` until the active run finishes.
 
 #### `replace`
 
@@ -544,7 +564,12 @@ All code changes must include tests. Favor table-driven tests where practical.
 - Manual runs are claimed and executed.
 - `next_run_at` is updated after scheduled enqueue.
 - One-time jobs disable themselves after first scheduled enqueue.
+- One-time jobs also disable themselves when a scheduled `forbid` decision
+  skips execution.
+- Queue policy keeps one active execution per job and leaves later runs
+  pending until the active run finishes.
 - `replace` cancels in-flight executions.
+- Canceled runs still persist partial output and update job summary fields.
 - Graceful shutdown releases lock and removes state file.
 
 ### CLI Tests
