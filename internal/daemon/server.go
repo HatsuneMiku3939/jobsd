@@ -97,7 +97,8 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		}
 	}()
 
-	if err := upsertInstanceMetadata(ctx, sqlite.NewMetadataStore(db), opts.Instance, port); err != nil {
+	metadataStore := sqlite.NewMetadataStore(db)
+	if err := upsertInstanceMetadata(ctx, metadataStore, opts.Instance, port); err != nil {
 		return err
 	}
 
@@ -139,10 +140,16 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	loopErrCh := make(chan error, 1)
 	go func() {
 		loopErrCh <- (&Loop{
+			Instance: opts.Instance,
 			JobStore: sqlite.NewJobStore(db),
 			RunStore: sqlite.NewRunStore(db),
 			Executor: ShellExecutor{},
-			Logger:   logger,
+			OnFinishNotifier: &OnFinishDispatcher{
+				MetadataReader:   metadataStore,
+				DeliveryRecorder: sqlite.NewRunHookDeliveryStore(db),
+				Logger:           logger,
+			},
+			Logger: logger,
 		}).Run(loopCtx)
 	}()
 

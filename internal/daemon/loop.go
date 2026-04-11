@@ -34,13 +34,15 @@ type loopRunStore interface {
 }
 
 type Loop struct {
-	JobStore   loopJobStore
-	RunStore   loopRunStore
-	Executor   Executor
-	Logger     *slog.Logger
-	Now        func() time.Time
-	Tick       <-chan time.Time
-	ClaimLimit int
+	Instance         string
+	JobStore         loopJobStore
+	RunStore         loopRunStore
+	Executor         Executor
+	OnFinishNotifier OnFinishNotifier
+	Logger           *slog.Logger
+	Now              func() time.Time
+	Tick             <-chan time.Time
+	ClaimLimit       int
 
 	mu            sync.Mutex
 	wg            sync.WaitGroup
@@ -222,11 +224,11 @@ func (l *Loop) startRunExecution(job domain.Job, run domain.Run) {
 		defer l.finishActiveRun(run.ID)
 
 		result := l.Executor.Execute(execCtx, job.Command)
-		l.persistRunCompletion(active, run, result)
+		l.persistRunCompletion(active, job, run, result)
 	}()
 }
 
-func (l *Loop) persistRunCompletion(active *activeRun, run domain.Run, result ExecutionResult) {
+func (l *Loop) persistRunCompletion(active *activeRun, job domain.Job, run domain.Run, result ExecutionResult) {
 	finalStatus := result.Status
 	errorMessage := result.ErrorMessage
 
@@ -274,6 +276,23 @@ func (l *Loop) persistRunCompletion(active *activeRun, run domain.Run, result Ex
 			slog.Int64("run_id", run.ID),
 			slog.String("error", err.Error()),
 		)
+	}
+
+	run.Status = finalStatus
+	run.FinishedAt = &finishedAt
+	run.ExitCode = cloneRunIntPtr(result.ExitCode)
+	run.ErrorMessage = cloneRunStringPtr(errorMessage)
+	run.RunnerID = nil
+	run.Output = cloneLoopRunOutput(result.Output)
+
+	if l.OnFinishNotifier != nil {
+		if err := l.OnFinishNotifier.Notify(persistCtx, l.Instance, job, run); err != nil {
+			l.logger().Error(
+				"deliver on_finish hook failed",
+				slog.Int64("run_id", run.ID),
+				slog.String("error", err.Error()),
+			)
+		}
 	}
 }
 
@@ -336,6 +355,33 @@ func (l *Loop) ensureRunnerID() string {
 	}
 
 	return l.runnerID
+}
+
+func cloneLoopRunOutput(output *domain.RunOutput) *domain.RunOutput {
+	if output == nil {
+		return nil
+	}
+
+	cloned := *output
+	return &cloned
+}
+
+func cloneRunIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+
+	cloned := *value
+	return &cloned
+}
+
+func cloneRunStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	cloned := *value
+	return &cloned
 }
 
 func (l *Loop) tickChannel() (<-chan time.Time, func()) {

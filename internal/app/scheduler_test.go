@@ -31,7 +31,7 @@ func TestSchedulerCommandStructure(t *testing.T) {
 	}
 
 	slices.Sort(gotNames)
-	wantNames := []string{"ping", "serve", "start", "status", "stop"}
+	wantNames := []string{"on-finish", "ping", "serve", "start", "status", "stop"}
 	if !slices.Equal(gotNames, wantNames) {
 		t.Fatalf("command names = %#v, want %#v", gotNames, wantNames)
 	}
@@ -64,6 +64,11 @@ func TestSchedulerCommandsRequireFlags(t *testing.T) {
 		{
 			name: "ping missing instance",
 			args: []string{"scheduler", "ping"},
+			want: `required flag(s) "instance" not set`,
+		},
+		{
+			name: "on-finish get missing instance",
+			args: []string{"scheduler", "on-finish", "get"},
 			want: `required flag(s) "instance" not set`,
 		},
 	}
@@ -367,6 +372,11 @@ func TestSchedulerHelpIncludesJobsdExamples(t *testing.T) {
 			args: []string{"scheduler", "ping", "--help"},
 			want: "jobsd scheduler ping --instance dev",
 		},
+		{
+			name: "scheduler on-finish",
+			args: []string{"scheduler", "on-finish", "--help"},
+			want: "jobsd scheduler on-finish get --instance dev",
+		},
 	}
 
 	for _, tt := range tests {
@@ -379,6 +389,55 @@ func TestSchedulerHelpIncludesJobsdExamples(t *testing.T) {
 				t.Fatalf("stdout = %q, want substring %q", stdout, tt.want)
 			}
 		})
+	}
+}
+
+func TestSchedulerOnFinishSetGetClear(t *testing.T) {
+	setTestDirs(t)
+
+	stdout, err := executeRootCommand(
+		t,
+		"--output", "json",
+		"scheduler", "on-finish", "set",
+		"--instance", "dev",
+		"--config-json", `{"type":"http","http":{"url":"http://127.0.0.1:8080/hooks","headers":{"Authorization":"Bearer token"}}}`,
+	)
+	if err != nil {
+		t.Fatalf("scheduler on-finish set error = %v", err)
+	}
+
+	var setPayload schedulerOnFinishOutput
+	if err := json.Unmarshal([]byte(stdout), &setPayload); err != nil {
+		t.Fatalf("Unmarshal(set) error = %v", err)
+	}
+	if setPayload.OnFinish == nil || setPayload.OnFinish.HTTP == nil || setPayload.OnFinish.HTTP.URL != "http://127.0.0.1:8080/hooks" {
+		t.Fatalf("setPayload.OnFinish = %#v, want http config", setPayload.OnFinish)
+	}
+
+	stdout, err = executeRootCommand(t, "--output", "json", "scheduler", "on-finish", "get", "--instance", "dev")
+	if err != nil {
+		t.Fatalf("scheduler on-finish get error = %v", err)
+	}
+
+	var getPayload schedulerOnFinishOutput
+	if err := json.Unmarshal([]byte(stdout), &getPayload); err != nil {
+		t.Fatalf("Unmarshal(get) error = %v", err)
+	}
+	if getPayload.OnFinish == nil || getPayload.OnFinish.HTTP == nil || getPayload.OnFinish.HTTP.Headers["Authorization"] != "Bearer token" {
+		t.Fatalf("getPayload.OnFinish = %#v, want preserved Authorization header", getPayload.OnFinish)
+	}
+
+	stdout, err = executeRootCommand(t, "--output", "json", "scheduler", "on-finish", "clear", "--instance", "dev")
+	if err != nil {
+		t.Fatalf("scheduler on-finish clear error = %v", err)
+	}
+
+	var clearPayload schedulerOnFinishOutput
+	if err := json.Unmarshal([]byte(stdout), &clearPayload); err != nil {
+		t.Fatalf("Unmarshal(clear) error = %v", err)
+	}
+	if clearPayload.OnFinish != nil {
+		t.Fatalf("clearPayload.OnFinish = %#v, want nil", clearPayload.OnFinish)
 	}
 }
 

@@ -25,9 +25,16 @@ func TestJobStoreCRUD(t *testing.T) {
 		Timezone:          "UTC",
 		Enabled:           true,
 		ConcurrencyPolicy: domain.ConcurrencyPolicyQueue,
-		NextRunAt:         &nextRunAt,
-		CreatedAt:         createdAt,
-		UpdatedAt:         updatedAt,
+		OnFinish: &domain.OnFinishConfig{
+			Type: domain.OnFinishSinkTypeCommand,
+			Command: &domain.CommandSinkConfig{
+				Program: "echo",
+				Args:    []string{"hook"},
+			},
+		},
+		NextRunAt: &nextRunAt,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
 	}
 
 	created, err := store.Create(ctx, job)
@@ -47,6 +54,7 @@ func TestJobStoreCRUD(t *testing.T) {
 		Timezone:          job.Timezone,
 		Enabled:           job.Enabled,
 		ConcurrencyPolicy: job.ConcurrencyPolicy,
+		OnFinish:          job.OnFinish,
 		NextRunAt:         job.NextRunAt,
 		CreatedAt:         job.CreatedAt,
 		UpdatedAt:         job.UpdatedAt,
@@ -93,36 +101,38 @@ func TestJobStoreCRUD(t *testing.T) {
 	lastRunStatus := domain.RunStatusSucceeded
 	lastRunAt := createdAt.Add(2 * time.Hour)
 	updatedJob, err := store.Update(ctx, domain.Job{
-		ID:                created.ID,
-		Name:              "cleanup-nightly",
-		Command:           "echo cleanup-nightly",
-		ScheduleKind:      domain.ScheduleKindOnce,
-		ScheduleExpr:      "after 10m",
-		Timezone:          "Asia/Seoul",
-		Enabled:           false,
-		ConcurrencyPolicy: domain.ConcurrencyPolicyReplace,
-		LastRunAt:         &lastRunAt,
-		LastRunStatus:     &lastRunStatus,
-		CreatedAt:         created.CreatedAt,
-		UpdatedAt:         created.UpdatedAt.Add(2 * time.Hour),
+		ID:                       created.ID,
+		Name:                     "cleanup-nightly",
+		Command:                  "echo cleanup-nightly",
+		ScheduleKind:             domain.ScheduleKindOnce,
+		ScheduleExpr:             "after 10m",
+		Timezone:                 "Asia/Seoul",
+		Enabled:                  false,
+		ConcurrencyPolicy:        domain.ConcurrencyPolicyReplace,
+		DisableInheritedOnFinish: true,
+		LastRunAt:                &lastRunAt,
+		LastRunStatus:            &lastRunStatus,
+		CreatedAt:                created.CreatedAt,
+		UpdatedAt:                created.UpdatedAt.Add(2 * time.Hour),
 	})
 	if err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 
 	assertJobMatches(t, updatedJob, domain.Job{
-		ID:                created.ID,
-		Name:              "cleanup-nightly",
-		Command:           "echo cleanup-nightly",
-		ScheduleKind:      domain.ScheduleKindOnce,
-		ScheduleExpr:      "after 10m",
-		Timezone:          "Asia/Seoul",
-		Enabled:           false,
-		ConcurrencyPolicy: domain.ConcurrencyPolicyReplace,
-		LastRunAt:         &lastRunAt,
-		LastRunStatus:     &lastRunStatus,
-		CreatedAt:         created.CreatedAt,
-		UpdatedAt:         created.UpdatedAt.Add(2 * time.Hour),
+		ID:                       created.ID,
+		Name:                     "cleanup-nightly",
+		Command:                  "echo cleanup-nightly",
+		ScheduleKind:             domain.ScheduleKindOnce,
+		ScheduleExpr:             "after 10m",
+		Timezone:                 "Asia/Seoul",
+		Enabled:                  false,
+		ConcurrencyPolicy:        domain.ConcurrencyPolicyReplace,
+		DisableInheritedOnFinish: true,
+		LastRunAt:                &lastRunAt,
+		LastRunStatus:            &lastRunStatus,
+		CreatedAt:                created.CreatedAt,
+		UpdatedAt:                created.UpdatedAt.Add(2 * time.Hour),
 	})
 
 	if err := store.DeleteByName(ctx, second.Name); err != nil {
@@ -142,6 +152,25 @@ func TestJobStoreDeleteByNameNotFound(t *testing.T) {
 	err := store.DeleteByName(ctx, "missing")
 	if !errors.Is(err, ErrJobNotFound) {
 		t.Fatalf("DeleteByName() error = %v, want %v", err, ErrJobNotFound)
+	}
+}
+
+func TestJobStoreRejectsConflictingOnFinishFields(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedTestDB(t)
+	store := NewJobStore(db)
+
+	job := testJob("cleanup")
+	job.OnFinish = &domain.OnFinishConfig{
+		Type: domain.OnFinishSinkTypeCommand,
+		Command: &domain.CommandSinkConfig{
+			Program: "echo",
+		},
+	}
+	job.DisableInheritedOnFinish = true
+
+	if _, err := store.Create(ctx, job); err == nil {
+		t.Fatal("Create() error = nil, want validation error")
 	}
 }
 
@@ -298,6 +327,10 @@ func assertJobMatches(t *testing.T, got domain.Job, want domain.Job) {
 	if got.ConcurrencyPolicy != want.ConcurrencyPolicy {
 		t.Fatalf("ConcurrencyPolicy = %q, want %q", got.ConcurrencyPolicy, want.ConcurrencyPolicy)
 	}
+	assertOnFinishConfigEqual(t, got.OnFinish, want.OnFinish)
+	if got.DisableInheritedOnFinish != want.DisableInheritedOnFinish {
+		t.Fatalf("DisableInheritedOnFinish = %v, want %v", got.DisableInheritedOnFinish, want.DisableInheritedOnFinish)
+	}
 	assertTimePtrEqual(t, "NextRunAt", got.NextRunAt, want.NextRunAt)
 	assertTimePtrEqual(t, "LastRunAt", got.LastRunAt, want.LastRunAt)
 	assertRunStatusPtrEqual(t, got.LastRunStatus, want.LastRunStatus)
@@ -334,5 +367,27 @@ func assertRunStatusPtrEqual(t *testing.T, got *domain.RunStatus, want *domain.R
 	}
 	if *got != *want {
 		t.Fatalf("LastRunStatus = %q, want %q", *got, *want)
+	}
+}
+
+func assertOnFinishConfigEqual(t *testing.T, got *domain.OnFinishConfig, want *domain.OnFinishConfig) {
+	t.Helper()
+
+	gotJSON, err := domain.MarshalOnFinishConfigJSON(got)
+	if err != nil {
+		t.Fatalf("MarshalOnFinishConfigJSON(got) error = %v", err)
+	}
+	wantJSON, err := domain.MarshalOnFinishConfigJSON(want)
+	if err != nil {
+		t.Fatalf("MarshalOnFinishConfigJSON(want) error = %v", err)
+	}
+
+	switch {
+	case gotJSON == nil && wantJSON == nil:
+		return
+	case gotJSON == nil || wantJSON == nil:
+		t.Fatalf("OnFinish = %v, want %v", got, want)
+	case *gotJSON != *wantJSON:
+		t.Fatalf("OnFinish = %s, want %s", *gotJSON, *wantJSON)
 	}
 }

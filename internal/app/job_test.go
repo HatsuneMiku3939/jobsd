@@ -104,6 +104,16 @@ func TestJobCommandValidation(t *testing.T) {
 			args: []string{"job", "update", "--instance", "dev", "--name", "cleanup", "--enabled", "--disabled"},
 			want: `--enabled and --disabled cannot be used together`,
 		},
+		{
+			name: "add conflicting on finish and disable inherited",
+			args: []string{"job", "add", "--instance", "dev", "--name", "cleanup", "--schedule", "every 10m", "--command", "echo cleanup", "--on-finish-config-json", `{"type":"command","command":{"program":"echo"}}`, "--disable-inherited-on-finish"},
+			want: `--on-finish-config-json and --disable-inherited-on-finish cannot be used together`,
+		},
+		{
+			name: "update conflicting on finish and clear",
+			args: []string{"job", "update", "--instance", "dev", "--name", "cleanup", "--on-finish-config-json", `{"type":"command","command":{"program":"echo"}}`, "--clear-on-finish"},
+			want: `--on-finish-config-json and --clear-on-finish cannot be used together`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -256,6 +266,59 @@ func TestJobAddDisabledAndOneTimeIntegration(t *testing.T) {
 	}
 }
 
+func TestJobOnFinishIntegration(t *testing.T) {
+	setTestDirs(t)
+	setFixedCurrentTime(t, time.Date(2025, 4, 10, 10, 0, 0, 0, time.UTC))
+
+	stdout, err := executeRootCommand(
+		t,
+		"--output", "json",
+		"job", "add",
+		"--instance", "dev",
+		"--name", "cleanup",
+		"--schedule", "every 10m",
+		"--command", "echo cleanup",
+		"--on-finish-config-json", `{"type":"command","command":{"program":"echo","args":["hook"]}}`,
+	)
+	if err != nil {
+		t.Fatalf("job add error = %v", err)
+	}
+
+	var added jobDetailOutput
+	if err := json.Unmarshal([]byte(stdout), &added); err != nil {
+		t.Fatalf("Unmarshal(add) error = %v", err)
+	}
+	if added.OnFinish == nil || added.OnFinish.Command == nil || added.OnFinish.Command.Program != "echo" {
+		t.Fatalf("added.OnFinish = %#v, want command config", added.OnFinish)
+	}
+	if added.DisableInheritedOnFinish {
+		t.Fatal("added.DisableInheritedOnFinish = true, want false")
+	}
+
+	stdout, err = executeRootCommand(
+		t,
+		"--output", "json",
+		"job", "update",
+		"--instance", "dev",
+		"--name", "cleanup",
+		"--disable-inherited-on-finish",
+	)
+	if err != nil {
+		t.Fatalf("job update error = %v", err)
+	}
+
+	var updated jobDetailOutput
+	if err := json.Unmarshal([]byte(stdout), &updated); err != nil {
+		t.Fatalf("Unmarshal(update) error = %v", err)
+	}
+	if updated.OnFinish != nil {
+		t.Fatalf("updated.OnFinish = %#v, want nil", updated.OnFinish)
+	}
+	if !updated.DisableInheritedOnFinish {
+		t.Fatal("updated.DisableInheritedOnFinish = false, want true")
+	}
+}
+
 func TestJobHelpIncludesJobsdExamples(t *testing.T) {
 	setTestDirs(t)
 
@@ -316,19 +379,21 @@ func TestJobTableOutputIsStable(t *testing.T) {
 	}
 
 	const want = "" +
-		"FIELD               VALUE\n" +
-		"ID                  1\n" +
-		"NAME                cleanup\n" +
-		"COMMAND             echo cleanup\n" +
-		"SCHEDULE            every 10m\n" +
-		"TIMEZONE            UTC\n" +
-		"ENABLED             true\n" +
-		"CONCURRENCY_POLICY  forbid\n" +
-		"NEXT_RUN_AT         2025-04-10T10:10:00Z\n" +
-		"LAST_RUN_AT         \n" +
-		"LAST_RUN_STATUS     \n" +
-		"CREATED_AT          2025-04-10T10:00:00Z\n" +
-		"UPDATED_AT          2025-04-10T10:00:00Z\n"
+		"FIELD                        VALUE\n" +
+		"ID                           1\n" +
+		"NAME                         cleanup\n" +
+		"COMMAND                      echo cleanup\n" +
+		"SCHEDULE                     every 10m\n" +
+		"TIMEZONE                     UTC\n" +
+		"ENABLED                      true\n" +
+		"CONCURRENCY_POLICY           forbid\n" +
+		"ON_FINISH                    \n" +
+		"DISABLE_INHERITED_ON_FINISH  false\n" +
+		"NEXT_RUN_AT                  2025-04-10T10:10:00Z\n" +
+		"LAST_RUN_AT                  \n" +
+		"LAST_RUN_STATUS              \n" +
+		"CREATED_AT                   2025-04-10T10:00:00Z\n" +
+		"UPDATED_AT                   2025-04-10T10:00:00Z\n"
 	if stdout != want {
 		t.Fatalf("job get table output = %q, want %q", stdout, want)
 	}

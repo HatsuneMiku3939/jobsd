@@ -100,6 +100,20 @@ type InstanceMetadata struct {
 	InstanceName  string
 	CreatedAt     time.Time
 	SchedulerPort int
+	OnFinish      *OnFinishConfig
+}
+
+type RunHookDelivery struct {
+	ID             int64
+	RunID          int64
+	Event          string
+	SinkType       OnFinishSinkType
+	Attempt        int
+	Status         HookDeliveryStatus
+	HTTPStatusCode *int
+	ErrorMessage   *string
+	StartedAt      time.Time
+	FinishedAt     time.Time
 }
 
 type SchedulerState struct {

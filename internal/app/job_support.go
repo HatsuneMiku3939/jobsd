@@ -26,18 +26,20 @@ type jobSummaryOutput struct {
 }
 
 type jobDetailOutput struct {
-	ID                int64   `json:"id"`
-	Name              string  `json:"name"`
-	Command           string  `json:"command"`
-	Schedule          string  `json:"schedule"`
-	Timezone          string  `json:"timezone"`
-	Enabled           bool    `json:"enabled"`
-	ConcurrencyPolicy string  `json:"concurrency_policy"`
-	NextRunAt         *string `json:"next_run_at"`
-	LastRunAt         *string `json:"last_run_at"`
-	LastRunStatus     *string `json:"last_run_status"`
-	CreatedAt         string  `json:"created_at"`
-	UpdatedAt         string  `json:"updated_at"`
+	ID                       int64                  `json:"id"`
+	Name                     string                 `json:"name"`
+	Command                  string                 `json:"command"`
+	Schedule                 string                 `json:"schedule"`
+	Timezone                 string                 `json:"timezone"`
+	Enabled                  bool                   `json:"enabled"`
+	ConcurrencyPolicy        string                 `json:"concurrency_policy"`
+	OnFinish                 *domain.OnFinishConfig `json:"on_finish"`
+	DisableInheritedOnFinish bool                   `json:"disable_inherited_on_finish"`
+	NextRunAt                *string                `json:"next_run_at"`
+	LastRunAt                *string                `json:"last_run_at"`
+	LastRunStatus            *string                `json:"last_run_status"`
+	CreatedAt                string                 `json:"created_at"`
+	UpdatedAt                string                 `json:"updated_at"`
 }
 
 type deleteResultOutput struct {
@@ -195,18 +197,20 @@ func jobSummaryFromDomain(job domain.Job) jobSummaryOutput {
 
 func jobDetailFromDomain(job domain.Job) jobDetailOutput {
 	return jobDetailOutput{
-		ID:                job.ID,
-		Name:              job.Name,
-		Command:           job.Command,
-		Schedule:          job.ScheduleExpr,
-		Timezone:          normalizedTimezone(job.Timezone),
-		Enabled:           job.Enabled,
-		ConcurrencyPolicy: string(job.ConcurrencyPolicy),
-		NextRunAt:         formatTimePtrRFC3339(job.NextRunAt),
-		LastRunAt:         formatTimePtrRFC3339(job.LastRunAt),
-		LastRunStatus:     runStatusStringPtr(job.LastRunStatus),
-		CreatedAt:         formatTimeRFC3339(job.CreatedAt),
-		UpdatedAt:         formatTimeRFC3339(job.UpdatedAt),
+		ID:                       job.ID,
+		Name:                     job.Name,
+		Command:                  job.Command,
+		Schedule:                 job.ScheduleExpr,
+		Timezone:                 normalizedTimezone(job.Timezone),
+		Enabled:                  job.Enabled,
+		ConcurrencyPolicy:        string(job.ConcurrencyPolicy),
+		OnFinish:                 cloneOnFinishConfig(job.OnFinish),
+		DisableInheritedOnFinish: job.DisableInheritedOnFinish,
+		NextRunAt:                formatTimePtrRFC3339(job.NextRunAt),
+		LastRunAt:                formatTimePtrRFC3339(job.LastRunAt),
+		LastRunStatus:            runStatusStringPtr(job.LastRunStatus),
+		CreatedAt:                formatTimeRFC3339(job.CreatedAt),
+		UpdatedAt:                formatTimeRFC3339(job.UpdatedAt),
 	}
 }
 
@@ -218,6 +222,31 @@ func runEnqueueFromDomain(jobName string, run domain.Run) runEnqueueOutput {
 		TriggerType: string(run.TriggerType),
 		QueuedAt:    formatTimeRFC3339(run.QueuedAt),
 	}
+}
+
+func cloneOnFinishConfig(config *domain.OnFinishConfig) *domain.OnFinishConfig {
+	if config == nil {
+		return nil
+	}
+
+	cloned := *config
+	if config.Command != nil {
+		command := *config.Command
+		command.Args = append([]string(nil), command.Args...)
+		cloned.Command = &command
+	}
+	if config.HTTP != nil {
+		httpConfig := *config.HTTP
+		if config.HTTP.Headers != nil {
+			httpConfig.Headers = make(map[string]string, len(config.HTTP.Headers))
+			for key, value := range config.HTTP.Headers {
+				httpConfig.Headers[key] = value
+			}
+		}
+		cloned.HTTP = &httpConfig
+	}
+
+	return &cloned
 }
 
 func runSummaryFromDomain(run domain.Run) runSummaryOutput {
