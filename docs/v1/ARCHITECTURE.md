@@ -29,6 +29,7 @@ jobsd/
 │   ├── daemon/
 │   │   ├── control.go
 │   │   ├── loop.go
+│   │   ├── on_finish.go
 │   │   ├── server.go
 │   │   ├── state.go
 │   │   └── executor.go
@@ -42,16 +43,19 @@ jobsd/
 │   │   ├── migrate.go
 │   │   ├── jobs_store.go
 │   │   ├── runs_store.go
-│   │   └── metadata_store.go
+│   │   ├── metadata_store.go
+│   │   └── run_hook_deliveries_store.go
 │   ├── domain/
 │   │   ├── job.go
+│   │   ├── on_finish.go
 │   │   ├── run.go
 │   │   └── types.go
 │   └── output/
 │       └── printer.go
 └── migrations/
     └── sqlite/
-        └── 0001_init.sql
+        ├── 0001_init.sql
+        └── 0002_on_finish_hooks.sql
 ```
 
 ## Package Responsibilities
@@ -82,7 +86,7 @@ Responsibilities:
 Suggested split:
 
 - `root.go`: root command and shared flags
-- `scheduler.go`: `scheduler start`, `status`, `stop`, `ping`
+- `scheduler.go`: `scheduler start`, `status`, `stop`, `ping`, `on-finish`
 - `job.go`: `job add`, `list`, `get`, `update`, `delete`, `pause`, `resume`, `run`
 - `run.go`: `run list`, `run get`
 - `version.go`: version command
@@ -113,6 +117,7 @@ Responsibilities:
 - claim pending runs
 - execute jobs
 - update run state
+- deliver post-run `on_finish` hooks without mutating the finalized run result
 
 Suggested split:
 
@@ -121,6 +126,15 @@ Suggested split:
 - `loop.go`: ticker-driven scheduling loop
 - `state.go`: runtime state file persistence and validation
 - `executor.go`: command execution, output capture, and terminal run results
+- `on_finish.go`: shared hook payload construction plus `command` and loopback `http` delivery
+
+`on_finish` delivery contract:
+
+- both sink types use the same JSON payload schema for `run.finished`
+- `command` hooks receive the payload on `stdin` plus `JOBSD_EVENT`, `JOBSD_INSTANCE`, and `JOBSD_RUN_ID`
+- `http` hooks send `POST` requests with `Content-Type: application/json`
+- command and HTTP delivery failures are recorded in `run_hook_deliveries` and do not overwrite the finalized run status
+- preview fields are truncated to `2048` bytes per stream and path fields are reserved for future expansion
 
 This package should focus on orchestration, not SQL details.
 Platform-specific daemon launch behavior may live behind small helpers so
@@ -167,6 +181,7 @@ Responsibilities:
 - open SQLite connections with the right pragmas
 - apply migrations
 - implement job and run persistence
+- implement hook delivery persistence
 - expose narrow storage methods used by the daemon and CLI
 
 Suggested store split:
@@ -175,7 +190,8 @@ Suggested store split:
 - `migrate.go`: migration runner
 - `jobs_store.go`: CRUD for jobs
 - `runs_store.go`: queueing, claiming, and reading runs
-- `metadata_store.go`: optional instance metadata access
+- `metadata_store.go`: optional instance metadata access, including instance-level `on_finish`
+- `run_hook_deliveries_store.go`: observability for per-attempt hook delivery results
 
 ### `internal/domain`
 
@@ -188,6 +204,8 @@ Suggested types:
 - `Schedule`
 - `RunStatus`
 - `ConcurrencyPolicy`
+- `OnFinishConfig`
+- `RunHookDelivery`
 
 This package should not depend on CLI or SQLite details.
 
@@ -231,6 +249,8 @@ daemon loop
   -> schedule calculation
   -> sqlite store
   -> executor
+  -> sqlite store
+  -> on_finish dispatcher
   -> sqlite store
 ```
 

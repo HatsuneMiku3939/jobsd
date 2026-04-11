@@ -50,6 +50,8 @@ func newJobAddCommand() *cobra.Command {
 		timezone          string
 		disabled          bool
 		concurrencyPolicy string
+		onFinishConfigRaw string
+		disableInherited  bool
 	)
 
 	cmd := &cobra.Command{
@@ -86,6 +88,14 @@ jobsd job add \
 			if err != nil {
 				return err
 			}
+			if onFinishConfigRaw != "" && disableInherited {
+				return fmt.Errorf("--on-finish-config-json and --disable-inherited-on-finish cannot be used together")
+			}
+
+			onFinishConfig, err := parseOptionalOnFinishConfig(onFinishConfigRaw)
+			if err != nil {
+				return err
+			}
 
 			now := currentTime()
 			enabled := !disabled
@@ -104,16 +114,18 @@ jobsd job add \
 			defer cleanup()
 
 			job, err := db.Jobs.Create(cmd.Context(), domain.Job{
-				Name:              name,
-				Command:           command,
-				ScheduleKind:      parsedSchedule.Kind,
-				ScheduleExpr:      parsedSchedule.Expr,
-				Timezone:          normalizedTZ,
-				Enabled:           enabled,
-				ConcurrencyPolicy: policy,
-				NextRunAt:         nextRunAt,
-				CreatedAt:         now,
-				UpdatedAt:         now,
+				Name:                     name,
+				Command:                  command,
+				ScheduleKind:             parsedSchedule.Kind,
+				ScheduleExpr:             parsedSchedule.Expr,
+				Timezone:                 normalizedTZ,
+				Enabled:                  enabled,
+				ConcurrencyPolicy:        policy,
+				OnFinish:                 onFinishConfig,
+				DisableInheritedOnFinish: disableInherited,
+				NextRunAt:                nextRunAt,
+				CreatedAt:                now,
+				UpdatedAt:                now,
 			})
 			if err != nil {
 				return err
@@ -130,6 +142,8 @@ jobsd job add \
 	cmd.Flags().StringVar(&timezone, "timezone", "Local", "Timezone for cron schedule evaluation")
 	cmd.Flags().BoolVar(&disabled, "disabled", false, "Create the job in a disabled state")
 	cmd.Flags().StringVar(&concurrencyPolicy, "concurrency-policy", string(domain.ConcurrencyPolicyForbid), "Concurrency policy: forbid|queue|replace")
+	cmd.Flags().StringVar(&onFinishConfigRaw, "on-finish-config-json", "", "JSON on_finish hook configuration")
+	cmd.Flags().BoolVar(&disableInherited, "disable-inherited-on-finish", false, "Disable inherited instance-level on_finish hook")
 	_ = cmd.MarkFlagRequired("instance")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("schedule")
@@ -221,6 +235,10 @@ func newJobUpdateCommand() *cobra.Command {
 		concurrencyPolicy string
 		enable            bool
 		disable           bool
+		onFinishConfigRaw string
+		clearOnFinish     bool
+		disableInherited  bool
+		inheritOnFinish   bool
 	)
 
 	cmd := &cobra.Command{
@@ -247,12 +265,25 @@ jobsd job update \
 			policyChanged := flags.Changed("concurrency-policy")
 			enableChanged := flags.Changed("enabled")
 			disableChanged := flags.Changed("disabled")
+			onFinishChanged := flags.Changed("on-finish-config-json")
+			clearOnFinishChanged := flags.Changed("clear-on-finish")
+			disableInheritedChanged := flags.Changed("disable-inherited-on-finish")
+			inheritOnFinishChanged := flags.Changed("inherit-on-finish")
 
-			if !nameChanged && !commandChanged && !scheduleChanged && !timezoneChanged && !policyChanged && !enableChanged && !disableChanged {
+			if !nameChanged && !commandChanged && !scheduleChanged && !timezoneChanged && !policyChanged && !enableChanged && !disableChanged && !onFinishChanged && !clearOnFinishChanged && !disableInheritedChanged && !inheritOnFinishChanged {
 				return fmt.Errorf("at least one field to update must be provided")
 			}
 			if enableChanged && disableChanged {
 				return fmt.Errorf("--enabled and --disabled cannot be used together")
+			}
+			if onFinishChanged && clearOnFinishChanged {
+				return fmt.Errorf("--on-finish-config-json and --clear-on-finish cannot be used together")
+			}
+			if disableInheritedChanged && inheritOnFinishChanged {
+				return fmt.Errorf("--disable-inherited-on-finish and --inherit-on-finish cannot be used together")
+			}
+			if onFinishChanged && disableInheritedChanged {
+				return fmt.Errorf("--on-finish-config-json and --disable-inherited-on-finish cannot be used together")
 			}
 
 			var parsedSchedule domain.Schedule
@@ -294,6 +325,15 @@ jobsd job update \
 				}
 
 				policy, err = parseConcurrencyPolicy(concurrencyPolicy)
+				if err != nil {
+					return err
+				}
+			}
+
+			var onFinishConfig *domain.OnFinishConfig
+			if onFinishChanged {
+				var err error
+				onFinishConfig, err = parseOptionalOnFinishConfig(onFinishConfigRaw)
 				if err != nil {
 					return err
 				}
@@ -341,6 +381,26 @@ jobsd job update \
 			if policyChanged {
 				updated.ConcurrencyPolicy = policy
 				changed = changed || updated.ConcurrencyPolicy != job.ConcurrencyPolicy
+			}
+			if onFinishChanged {
+				updated.OnFinish = onFinishConfig
+				updated.DisableInheritedOnFinish = false
+				changed = changed || !onFinishConfigsEqual(updated.OnFinish, job.OnFinish) || updated.DisableInheritedOnFinish != job.DisableInheritedOnFinish
+			}
+			if clearOnFinishChanged {
+				updated.OnFinish = nil
+				changed = changed || job.OnFinish != nil
+			}
+			if disableInheritedChanged {
+				updated.DisableInheritedOnFinish = true
+				if updated.OnFinish != nil {
+					updated.OnFinish = nil
+				}
+				changed = changed || updated.DisableInheritedOnFinish != job.DisableInheritedOnFinish || job.OnFinish != nil
+			}
+			if inheritOnFinishChanged {
+				updated.DisableInheritedOnFinish = false
+				changed = changed || updated.DisableInheritedOnFinish != job.DisableInheritedOnFinish
 			}
 			if enableChanged {
 				updated.Enabled = true
@@ -393,6 +453,10 @@ jobsd job update \
 	cmd.Flags().StringVar(&concurrencyPolicy, "concurrency-policy", "", "Updated concurrency policy")
 	cmd.Flags().BoolVar(&enable, "enabled", false, "Enable the job")
 	cmd.Flags().BoolVar(&disable, "disabled", false, "Disable the job")
+	cmd.Flags().StringVar(&onFinishConfigRaw, "on-finish-config-json", "", "Updated JSON on_finish hook configuration")
+	cmd.Flags().BoolVar(&clearOnFinish, "clear-on-finish", false, "Clear the job-level on_finish override")
+	cmd.Flags().BoolVar(&disableInherited, "disable-inherited-on-finish", false, "Disable inherited instance-level on_finish hook")
+	cmd.Flags().BoolVar(&inheritOnFinish, "inherit-on-finish", false, "Re-enable inheritance of the instance-level on_finish hook")
 	_ = cmd.MarkFlagRequired("instance")
 	_ = cmd.MarkFlagRequired("name")
 
@@ -678,6 +742,8 @@ func printJobDetail(cmd *cobra.Command, item jobDetailOutput) error {
 		{Name: "TIMEZONE", Value: item.Timezone},
 		{Name: "ENABLED", Value: boolString(item.Enabled)},
 		{Name: "CONCURRENCY_POLICY", Value: item.ConcurrencyPolicy},
+		{Name: "ON_FINISH", Value: formatOnFinishConfigValue(item.OnFinish)},
+		{Name: "DISABLE_INHERITED_ON_FINISH", Value: boolString(item.DisableInheritedOnFinish)},
 		{Name: "NEXT_RUN_AT", Value: stringValue(item.NextRunAt)},
 		{Name: "LAST_RUN_AT", Value: stringValue(item.LastRunAt)},
 		{Name: "LAST_RUN_STATUS", Value: stringValue(item.LastRunStatus)},

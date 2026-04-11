@@ -36,6 +36,14 @@ func (s *MetadataStore) Upsert(ctx context.Context, meta domain.InstanceMetadata
 		"created_at":     meta.CreatedAt.UTC().Format(time.RFC3339),
 		"scheduler_port": strconv.Itoa(meta.SchedulerPort),
 	}
+	onFinishJSON, err := domain.MarshalOnFinishConfigJSON(meta.OnFinish)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("marshal instance on_finish config: %w", err)
+	}
+	if onFinishJSON != nil {
+		values["on_finish_json"] = *onFinishJSON
+	}
 
 	for key, value := range values {
 		if _, err := tx.ExecContext(ctx, `
@@ -47,6 +55,13 @@ ON CONFLICT(key) DO UPDATE SET
 `, key, value, updatedAt); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("upsert metadata %q: %w", key, err)
+		}
+	}
+
+	if onFinishJSON == nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM instance_metadata WHERE key = ?`, "on_finish_json"); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("delete metadata %q: %w", "on_finish_json", err)
 		}
 	}
 
@@ -62,6 +77,7 @@ func (s *MetadataStore) Get(ctx context.Context) (domain.InstanceMetadata, error
 SELECT key, value
 FROM instance_metadata
 WHERE key IN ('instance_name', 'created_at', 'scheduler_port')
+   OR key = 'on_finish_json'
 `)
 	if err != nil {
 		return domain.InstanceMetadata{}, fmt.Errorf("query instance metadata: %w", err)
@@ -104,9 +120,31 @@ WHERE key IN ('instance_name', 'created_at', 'scheduler_port')
 		return domain.InstanceMetadata{}, fmt.Errorf("%w: scheduler_port: %v", ErrMetadataCorrupt, err)
 	}
 
+	var onFinish *domain.OnFinishConfig
+	if raw, ok := values["on_finish_json"]; ok {
+		onFinish, err = domain.ParseOnFinishConfigJSON(raw)
+		if err != nil {
+			return domain.InstanceMetadata{}, fmt.Errorf("%w: on_finish_json: %v", ErrMetadataCorrupt, err)
+		}
+	}
+
 	return domain.InstanceMetadata{
 		InstanceName:  instanceName,
 		CreatedAt:     createdAt.UTC(),
 		SchedulerPort: schedulerPort,
+		OnFinish:      onFinish,
 	}, nil
+}
+
+func (s *MetadataStore) SetOnFinish(ctx context.Context, config *domain.OnFinishConfig) error {
+	meta, err := s.Get(ctx)
+	switch {
+	case err == nil:
+		meta.OnFinish = config
+		return s.Upsert(ctx, meta)
+	case errors.Is(err, ErrMetadataNotFound):
+		return ErrMetadataNotFound
+	default:
+		return err
+	}
 }

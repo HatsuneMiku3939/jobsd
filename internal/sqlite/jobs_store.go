@@ -25,6 +25,11 @@ func (s *JobStore) Create(ctx context.Context, job domain.Job) (domain.Job, erro
 		return domain.Job{}, err
 	}
 
+	insertArgs, err := jobInsertArgs(job)
+	if err != nil {
+		return domain.Job{}, err
+	}
+
 	result, err := s.db.ExecContext(ctx, `
 INSERT INTO jobs (
     name,
@@ -34,26 +39,17 @@ INSERT INTO jobs (
     timezone,
     enabled,
     concurrency_policy,
+    on_finish_json,
+    disable_inherited_on_finish,
     next_run_at,
     last_run_at,
     last_run_status,
     created_at,
     updated_at
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `,
-		job.Name,
-		job.Command,
-		string(job.ScheduleKind),
-		job.ScheduleExpr,
-		defaultTimezone(job.Timezone),
-		boolToInt(job.Enabled),
-		defaultConcurrencyPolicy(job.ConcurrencyPolicy),
-		formatTimePtr(job.NextRunAt),
-		formatTimePtr(job.LastRunAt),
-		formatRunStatusPtr(job.LastRunStatus),
-		formatTime(job.CreatedAt),
-		formatTime(job.UpdatedAt),
+		insertArgs...,
 	)
 	if err != nil {
 		return domain.Job{}, fmt.Errorf("insert job: %w", err)
@@ -70,6 +66,33 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	}
 
 	return created, nil
+}
+
+func jobInsertArgs(job domain.Job) ([]any, error) {
+	args := make([]any, 0, 14)
+	args = append(args,
+		job.Name,
+		job.Command,
+		string(job.ScheduleKind),
+		job.ScheduleExpr,
+		defaultTimezone(job.Timezone),
+		boolToInt(job.Enabled),
+		defaultConcurrencyPolicy(job.ConcurrencyPolicy),
+	)
+	onFinishValues, err := onFinishDBValues(job)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, onFinishValues...)
+	args = append(args,
+		formatTimePtr(job.NextRunAt),
+		formatTimePtr(job.LastRunAt),
+		formatRunStatusPtr(job.LastRunStatus),
+		formatTime(job.CreatedAt),
+		formatTime(job.UpdatedAt),
+	)
+
+	return args, nil
 }
 
 func (s *JobStore) GetByName(ctx context.Context, name string) (domain.Job, error) {
@@ -120,6 +143,11 @@ func (s *JobStore) Update(ctx context.Context, job domain.Job) (domain.Job, erro
 		return domain.Job{}, err
 	}
 
+	updateArgs, err := jobUpdateArgs(job)
+	if err != nil {
+		return domain.Job{}, err
+	}
+
 	result, err := s.db.ExecContext(ctx, `
 UPDATE jobs
 SET
@@ -130,24 +158,15 @@ SET
     timezone = ?,
     enabled = ?,
     concurrency_policy = ?,
+    on_finish_json = ?,
+    disable_inherited_on_finish = ?,
     next_run_at = ?,
     last_run_at = ?,
     last_run_status = ?,
     updated_at = ?
 WHERE id = ?
 `,
-		job.Name,
-		job.Command,
-		string(job.ScheduleKind),
-		job.ScheduleExpr,
-		defaultTimezone(job.Timezone),
-		boolToInt(job.Enabled),
-		defaultConcurrencyPolicy(job.ConcurrencyPolicy),
-		formatTimePtr(job.NextRunAt),
-		formatTimePtr(job.LastRunAt),
-		formatRunStatusPtr(job.LastRunStatus),
-		formatTime(job.UpdatedAt),
-		job.ID,
+		updateArgs...,
 	)
 	if err != nil {
 		return domain.Job{}, fmt.Errorf("update job %d: %w", job.ID, err)
@@ -163,6 +182,33 @@ WHERE id = ?
 	}
 
 	return updated, nil
+}
+
+func jobUpdateArgs(job domain.Job) ([]any, error) {
+	args := make([]any, 0, 13)
+	args = append(args,
+		job.Name,
+		job.Command,
+		string(job.ScheduleKind),
+		job.ScheduleExpr,
+		defaultTimezone(job.Timezone),
+		boolToInt(job.Enabled),
+		defaultConcurrencyPolicy(job.ConcurrencyPolicy),
+	)
+	onFinishValues, err := onFinishDBValues(job)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, onFinishValues...)
+	args = append(args,
+		formatTimePtr(job.NextRunAt),
+		formatTimePtr(job.LastRunAt),
+		formatRunStatusPtr(job.LastRunStatus),
+		formatTime(job.UpdatedAt),
+		job.ID,
+	)
+
+	return args, nil
 }
 
 func (s *JobStore) DeleteByName(ctx context.Context, name string) error {
@@ -257,6 +303,8 @@ SELECT
     timezone,
     enabled,
     concurrency_policy,
+    on_finish_json,
+    disable_inherited_on_finish,
     next_run_at,
     last_run_at,
     last_run_status,
@@ -291,6 +339,8 @@ func scanJob(scanner jobScanner) (domain.Job, error) {
 		scheduleKindRaw      string
 		enabledRaw           int
 		concurrencyPolicyRaw string
+		onFinishJSONRaw      sql.NullString
+		disableInheritedRaw  int
 		nextRunAtRaw         sql.NullString
 		lastRunAtRaw         sql.NullString
 		lastRunStatusRaw     sql.NullString
@@ -307,6 +357,8 @@ func scanJob(scanner jobScanner) (domain.Job, error) {
 		&job.Timezone,
 		&enabledRaw,
 		&concurrencyPolicyRaw,
+		&onFinishJSONRaw,
+		&disableInheritedRaw,
 		&nextRunAtRaw,
 		&lastRunAtRaw,
 		&lastRunStatusRaw,
@@ -332,6 +384,16 @@ func scanJob(scanner jobScanner) (domain.Job, error) {
 		return domain.Job{}, fmt.Errorf("invalid enabled flag for job %d: %w", job.ID, err)
 	}
 	job.Enabled = enabled
+
+	job.OnFinish, err = parseOnFinishConfigPtr(onFinishJSONRaw)
+	if err != nil {
+		return domain.Job{}, fmt.Errorf("parse on_finish_json for job %d: %w", job.ID, err)
+	}
+
+	job.DisableInheritedOnFinish, err = intToBool(disableInheritedRaw)
+	if err != nil {
+		return domain.Job{}, fmt.Errorf("invalid disable_inherited_on_finish for job %d: %w", job.ID, err)
+	}
 
 	job.NextRunAt, err = parseTimePtr(nextRunAtRaw)
 	if err != nil {
@@ -371,8 +433,27 @@ func validateJob(job domain.Job) error {
 	if job.LastRunStatus != nil && !job.LastRunStatus.IsValid() {
 		return fmt.Errorf("invalid last run status %q", *job.LastRunStatus)
 	}
+	if job.OnFinish != nil && job.DisableInheritedOnFinish {
+		return fmt.Errorf("on_finish override cannot be combined with disable_inherited_on_finish")
+	}
+	if job.OnFinish != nil {
+		normalized, err := domain.NormalizeOnFinishConfig(*job.OnFinish)
+		if err != nil {
+			return err
+		}
+		job.OnFinish = &normalized
+	}
 
 	return nil
+}
+
+func onFinishDBValues(job domain.Job) ([]any, error) {
+	onFinishJSON, err := domain.MarshalOnFinishConfigJSON(job.OnFinish)
+	if err != nil {
+		return nil, fmt.Errorf("marshal on_finish config: %w", err)
+	}
+
+	return []any{stringPtrValue(onFinishJSON), boolToInt(job.DisableInheritedOnFinish)}, nil
 }
 
 func ensureRowsAffected(result sql.Result, notFound error) error {
@@ -475,4 +556,12 @@ func parseRunStatusPtr(raw sql.NullString) (*domain.RunStatus, error) {
 	}
 
 	return &status, nil
+}
+
+func parseOnFinishConfigPtr(raw sql.NullString) (*domain.OnFinishConfig, error) {
+	if !raw.Valid {
+		return nil, nil
+	}
+
+	return domain.ParseOnFinishConfigJSON(raw.String)
 }

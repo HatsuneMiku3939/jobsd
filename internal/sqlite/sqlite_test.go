@@ -33,6 +33,7 @@ func TestOpenAndMigrate(t *testing.T) {
 	assertTableExists(t, db, "jobs")
 	assertTableExists(t, db, "job_runs")
 	assertTableExists(t, db, "job_run_outputs")
+	assertTableExists(t, db, "run_hook_deliveries")
 	assertTableExists(t, db, "instance_metadata")
 
 	assertIndexExists(t, db, "idx_jobs_name")
@@ -40,6 +41,7 @@ func TestOpenAndMigrate(t *testing.T) {
 	assertIndexExists(t, db, "idx_job_runs_job_id_queued_at")
 	assertIndexExists(t, db, "idx_job_runs_status_queued_at")
 	assertIndexExists(t, db, "idx_job_runs_scheduled_for")
+	assertIndexExists(t, db, "idx_run_hook_deliveries_run_id_attempt")
 
 	assertPragmaValue(t, db, "foreign_keys", "1")
 	assertPragmaValue(t, db, "journal_mode", "wal")
@@ -57,6 +59,12 @@ func TestMetadataStore(t *testing.T) {
 		InstanceName:  "dev",
 		CreatedAt:     createdAt,
 		SchedulerPort: 8080,
+		OnFinish: &domain.OnFinishConfig{
+			Type: domain.OnFinishSinkTypeCommand,
+			Command: &domain.CommandSinkConfig{
+				Program: "echo",
+			},
+		},
 	}
 
 	if err := store.Upsert(ctx, meta); err != nil {
@@ -67,9 +75,7 @@ func TestMetadataStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
-	if got != meta {
-		t.Fatalf("Get() = %#v, want %#v", got, meta)
-	}
+	assertInstanceMetadataEqual(t, got, meta)
 
 	firstUpdatedAt := metadataUpdatedAt(t, db, "scheduler_port")
 
@@ -77,6 +83,12 @@ func TestMetadataStore(t *testing.T) {
 		InstanceName:  "dev",
 		CreatedAt:     createdAt,
 		SchedulerPort: 9090,
+		OnFinish: &domain.OnFinishConfig{
+			Type: domain.OnFinishSinkTypeHTTP,
+			HTTP: &domain.HTTPSinkConfig{
+				URL: "http://127.0.0.1:8080/hooks",
+			},
+		},
 	}
 	time.Sleep(1100 * time.Millisecond)
 	if err := store.Upsert(ctx, updated); err != nil {
@@ -87,9 +99,7 @@ func TestMetadataStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get() after update error = %v", err)
 	}
-	if got != updated {
-		t.Fatalf("Get() after update = %#v, want %#v", got, updated)
-	}
+	assertInstanceMetadataEqual(t, got, updated)
 
 	secondUpdatedAt := metadataUpdatedAt(t, db, "scheduler_port")
 	if !secondUpdatedAt.After(firstUpdatedAt) {
@@ -123,6 +133,28 @@ func TestMetadataStoreErrors(t *testing.T) {
 			t.Fatalf("Upsert() error = %v", err)
 		}
 		if _, err := db.ExecContext(ctx, `UPDATE instance_metadata SET value = 'bad-port' WHERE key = 'scheduler_port'`); err != nil {
+			t.Fatalf("ExecContext() error = %v", err)
+		}
+
+		_, err := store.Get(ctx)
+		if !errors.Is(err, ErrMetadataCorrupt) {
+			t.Fatalf("Get() error = %v, want %v", err, ErrMetadataCorrupt)
+		}
+	})
+
+	t.Run("corrupt on_finish config", func(t *testing.T) {
+		db := openMigratedTestDB(t)
+		store := NewMetadataStore(db)
+
+		meta := domain.InstanceMetadata{
+			InstanceName:  "dev",
+			CreatedAt:     time.Date(2025, 4, 1, 12, 0, 0, 0, time.UTC),
+			SchedulerPort: 8080,
+		}
+		if err := store.Upsert(ctx, meta); err != nil {
+			t.Fatalf("Upsert() error = %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `INSERT INTO instance_metadata(key, value, updated_at) VALUES ('on_finish_json', 'bad-json', ?)`, time.Now().UTC().Format(time.RFC3339)); err != nil {
 			t.Fatalf("ExecContext() error = %v", err)
 		}
 
@@ -196,4 +228,35 @@ func metadataUpdatedAt(t *testing.T, db *sql.DB, key string) time.Time {
 	}
 
 	return value
+}
+
+func assertInstanceMetadataEqual(t *testing.T, got domain.InstanceMetadata, want domain.InstanceMetadata) {
+	t.Helper()
+
+	if got.InstanceName != want.InstanceName {
+		t.Fatalf("InstanceName = %q, want %q", got.InstanceName, want.InstanceName)
+	}
+	if !got.CreatedAt.Equal(want.CreatedAt) {
+		t.Fatalf("CreatedAt = %v, want %v", got.CreatedAt, want.CreatedAt)
+	}
+	if got.SchedulerPort != want.SchedulerPort {
+		t.Fatalf("SchedulerPort = %d, want %d", got.SchedulerPort, want.SchedulerPort)
+	}
+
+	gotJSON, err := domain.MarshalOnFinishConfigJSON(got.OnFinish)
+	if err != nil {
+		t.Fatalf("MarshalOnFinishConfigJSON(got) error = %v", err)
+	}
+	wantJSON, err := domain.MarshalOnFinishConfigJSON(want.OnFinish)
+	if err != nil {
+		t.Fatalf("MarshalOnFinishConfigJSON(want) error = %v", err)
+	}
+	switch {
+	case gotJSON == nil && wantJSON == nil:
+		return
+	case gotJSON == nil || wantJSON == nil:
+		t.Fatalf("OnFinish = %v, want %v", got.OnFinish, want.OnFinish)
+	case *gotJSON != *wantJSON:
+		t.Fatalf("OnFinish = %s, want %s", *gotJSON, *wantJSON)
+	}
 }

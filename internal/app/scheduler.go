@@ -15,6 +15,7 @@ import (
 	"github.com/hatsunemiku3939/jobsd/internal/daemon"
 	"github.com/hatsunemiku3939/jobsd/internal/domain"
 	"github.com/hatsunemiku3939/jobsd/internal/output"
+	"github.com/hatsunemiku3939/jobsd/internal/sqlite"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +38,11 @@ type schedulerOutput struct {
 	Reason    string                 `json:"reason,omitempty"`
 }
 
+type schedulerOnFinishOutput struct {
+	Instance string                 `json:"instance"`
+	OnFinish *domain.OnFinishConfig `json:"on_finish"`
+}
+
 func newSchedulerCommand(info BuildInfo) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scheduler",
@@ -51,12 +57,149 @@ jobsd scheduler stop --instance dev`),
 	}
 
 	cmd.AddCommand(
+		newSchedulerOnFinishCommand(),
 		newSchedulerStartCommand(),
 		newSchedulerStatusCommand(),
 		newSchedulerStopCommand(),
 		newSchedulerPingCommand(),
 		newSchedulerServeCommand(info),
 	)
+
+	return cmd
+}
+
+func newSchedulerOnFinishCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "on-finish",
+		Short: "Manage the instance-level on_finish hook",
+		Example: strings.TrimSpace(`
+jobsd scheduler on-finish get --instance dev
+jobsd scheduler on-finish set --instance dev --config-json '{"type":"http","http":{"url":"http://127.0.0.1:8080/hooks/jobsd"}}'
+jobsd scheduler on-finish clear --instance dev`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+
+	cmd.AddCommand(
+		newSchedulerOnFinishGetCommand(),
+		newSchedulerOnFinishSetCommand(),
+		newSchedulerOnFinishClearCommand(),
+	)
+
+	return cmd
+}
+
+func newSchedulerOnFinishGetCommand() *cobra.Command {
+	var instance string
+
+	cmd := &cobra.Command{
+		Use:     "get",
+		Short:   "Show the instance-level on_finish hook",
+		Example: "jobsd scheduler on-finish get --instance dev",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			db, cleanup, err := openInstanceDB(cmd.Context(), instance)
+			if err != nil {
+				return err
+			}
+			defer cleanup()
+
+			config, err := loadInstanceOnFinish(cmd.Context(), db, instance)
+			if err != nil {
+				return err
+			}
+
+			return printSchedulerOnFinishOutput(cmd, schedulerOnFinishOutput{
+				Instance: instance,
+				OnFinish: config,
+			})
+		},
+	}
+
+	cmd.Flags().StringVar(&instance, "instance", "", "Instance name")
+	_ = cmd.MarkFlagRequired("instance")
+
+	return cmd
+}
+
+func newSchedulerOnFinishSetCommand() *cobra.Command {
+	var (
+		instance  string
+		configRaw string
+	)
+
+	cmd := &cobra.Command{
+		Use:     "set",
+		Short:   "Set the instance-level on_finish hook",
+		Example: `jobsd scheduler on-finish set --instance dev --config-json '{"type":"command","command":{"program":"echo"}}'`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			config, err := parseOnFinishConfigFlag(configRaw)
+			if err != nil {
+				return err
+			}
+
+			db, cleanup, err := openInstanceDB(cmd.Context(), instance)
+			if err != nil {
+				return err
+			}
+			defer cleanup()
+
+			meta, err := ensureInstanceMetadata(cmd.Context(), db, instance)
+			if err != nil {
+				return err
+			}
+			meta.OnFinish = config
+			if err := db.Metadata.Upsert(cmd.Context(), meta); err != nil {
+				return fmt.Errorf("update instance on_finish metadata: %w", err)
+			}
+
+			return printSchedulerOnFinishOutput(cmd, schedulerOnFinishOutput{
+				Instance: instance,
+				OnFinish: config,
+			})
+		},
+	}
+
+	cmd.Flags().StringVar(&instance, "instance", "", "Instance name")
+	cmd.Flags().StringVar(&configRaw, "config-json", "", "JSON on_finish hook configuration")
+	_ = cmd.MarkFlagRequired("instance")
+	_ = cmd.MarkFlagRequired("config-json")
+
+	return cmd
+}
+
+func newSchedulerOnFinishClearCommand() *cobra.Command {
+	var instance string
+
+	cmd := &cobra.Command{
+		Use:     "clear",
+		Short:   "Clear the instance-level on_finish hook",
+		Example: "jobsd scheduler on-finish clear --instance dev",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			db, cleanup, err := openInstanceDB(cmd.Context(), instance)
+			if err != nil {
+				return err
+			}
+			defer cleanup()
+
+			meta, err := ensureInstanceMetadata(cmd.Context(), db, instance)
+			if err != nil {
+				return err
+			}
+			meta.OnFinish = nil
+			if err := db.Metadata.Upsert(cmd.Context(), meta); err != nil {
+				return fmt.Errorf("clear instance on_finish metadata: %w", err)
+			}
+
+			return printSchedulerOnFinishOutput(cmd, schedulerOnFinishOutput{
+				Instance: instance,
+				OnFinish: nil,
+			})
+		},
+	}
+
+	cmd.Flags().StringVar(&instance, "instance", "", "Instance name")
+	_ = cmd.MarkFlagRequired("instance")
 
 	return cmd
 }
@@ -380,6 +523,57 @@ func printSchedulerOutput(cmd *cobra.Command, value schedulerOutput) error {
 			value.Reason,
 		}},
 	)
+}
+
+func printSchedulerOnFinishOutput(cmd *cobra.Command, value schedulerOnFinishOutput) error {
+	format, err := commandOutputFormat(cmd)
+	if err != nil {
+		return err
+	}
+
+	printer := output.New(cmd.OutOrStdout(), format)
+	if format == output.FormatJSON {
+		return printer.PrintJSON(value)
+	}
+
+	return printer.PrintFields([]output.Field{
+		{Name: "INSTANCE", Value: value.Instance},
+		{Name: "ON_FINISH", Value: formatOnFinishConfigValue(value.OnFinish)},
+	})
+}
+
+func loadInstanceOnFinish(ctx context.Context, db *instanceDB, instance string) (*domain.OnFinishConfig, error) {
+	meta, err := db.Metadata.Get(ctx)
+	switch {
+	case err == nil:
+		if meta.InstanceName != instance {
+			return nil, fmt.Errorf("instance metadata mismatch: got %q want %q", meta.InstanceName, instance)
+		}
+		return meta.OnFinish, nil
+	case errors.Is(err, sqlite.ErrMetadataNotFound):
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("read instance metadata: %w", err)
+	}
+}
+
+func ensureInstanceMetadata(ctx context.Context, db *instanceDB, instance string) (domain.InstanceMetadata, error) {
+	meta, err := db.Metadata.Get(ctx)
+	switch {
+	case err == nil:
+		if meta.InstanceName != instance {
+			return domain.InstanceMetadata{}, fmt.Errorf("instance metadata mismatch: got %q want %q", meta.InstanceName, instance)
+		}
+		return meta, nil
+	case errors.Is(err, sqlite.ErrMetadataNotFound):
+		return domain.InstanceMetadata{
+			InstanceName:  instance,
+			CreatedAt:     currentTime(),
+			SchedulerPort: 0,
+		}, nil
+	default:
+		return domain.InstanceMetadata{}, fmt.Errorf("read instance metadata: %w", err)
+	}
 }
 
 func commandOutputFormat(cmd *cobra.Command) (output.Format, error) {

@@ -28,6 +28,7 @@ schema_migrations
 jobs
 job_runs
 job_run_outputs
+run_hook_deliveries
 instance_metadata
 ```
 
@@ -59,6 +60,8 @@ Recommended columns:
 - `timezone` TEXT NOT NULL DEFAULT 'Local'
 - `enabled` INTEGER NOT NULL DEFAULT 1
 - `concurrency_policy` TEXT NOT NULL DEFAULT 'forbid'
+- `on_finish_json` TEXT
+- `disable_inherited_on_finish` INTEGER NOT NULL DEFAULT 0
 - `next_run_at` TEXT
 - `last_run_at` TEXT
 - `last_run_status` TEXT
@@ -69,6 +72,7 @@ Constraints:
 
 - `UNIQUE(name)`
 - `CHECK(enabled IN (0, 1))`
+- `CHECK(disable_inherited_on_finish IN (0, 1))`
 - `CHECK(concurrency_policy IN ('forbid', 'queue', 'replace'))`
 
 Column intent:
@@ -77,6 +81,8 @@ Column intent:
 - `schedule_expr`: the user-facing or normalized schedule expression
 - `next_run_at`: next calculated execution time in UTC
 - `last_run_status`: a denormalized summary field for list views
+- `on_finish_json`: optional JSON hook config for a job-level override
+- `disable_inherited_on_finish`: when `1`, suppress the instance default hook for this job
 
 ## `job_runs`
 
@@ -135,6 +141,37 @@ Notes:
 - output should be capped to avoid uncontrolled database growth
 - if output retention becomes large, move full logs to files later
 
+## `run_hook_deliveries`
+
+Store observability records for each `on_finish` delivery attempt.
+
+Recommended columns:
+
+- `id` INTEGER PRIMARY KEY AUTOINCREMENT
+- `run_id` INTEGER NOT NULL
+- `event` TEXT NOT NULL
+- `sink_type` TEXT NOT NULL
+- `attempt` INTEGER NOT NULL
+- `status` TEXT NOT NULL
+- `http_status_code` INTEGER
+- `error_message` TEXT
+- `started_at` TEXT NOT NULL
+- `finished_at` TEXT NOT NULL
+
+Constraints:
+
+- `FOREIGN KEY(run_id) REFERENCES job_runs(id) ON DELETE CASCADE`
+- `CHECK(sink_type IN ('command', 'http'))`
+- `CHECK(status IN ('succeeded', 'failed', 'timed_out'))`
+
+Column intent:
+
+- `event`: v1 always stores `run.finished`
+- `sink_type`: delivery target type that was attempted
+- `attempt`: 1-based attempt number for one finalized run event
+- `http_status_code`: optional response code for HTTP hooks
+- `error_message`: delivery-specific failure detail that does not affect the main run result
+
 ## `instance_metadata`
 
 Store instance-local metadata that belongs in the database.
@@ -150,6 +187,7 @@ Suggested keys:
 - `instance_name`
 - `created_at`
 - `scheduler_port`
+- `on_finish_json`
 
 Notes:
 
@@ -157,6 +195,7 @@ Notes:
 - do not depend on this table for runtime exclusivity
 - `scheduler_port` stores the most recent loopback control port selected
   at scheduler startup
+- `on_finish_json` stores the instance-level default hook config when set
 
 ## Recommended Indexes
 
@@ -166,6 +205,7 @@ CREATE INDEX idx_jobs_enabled_next_run_at ON jobs(enabled, next_run_at);
 CREATE INDEX idx_job_runs_job_id_queued_at ON job_runs(job_id, queued_at DESC);
 CREATE INDEX idx_job_runs_status_queued_at ON job_runs(status, queued_at ASC);
 CREATE INDEX idx_job_runs_scheduled_for ON job_runs(scheduled_for);
+CREATE INDEX idx_run_hook_deliveries_run_id_attempt ON run_hook_deliveries(run_id, attempt);
 ```
 
 These indexes optimize:
@@ -191,6 +231,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     timezone TEXT NOT NULL DEFAULT 'Local',
     enabled INTEGER NOT NULL DEFAULT 1,
     concurrency_policy TEXT NOT NULL DEFAULT 'forbid',
+    on_finish_json TEXT,
+    disable_inherited_on_finish INTEGER NOT NULL DEFAULT 0,
     next_run_at TEXT,
     last_run_at TEXT,
     last_run_status TEXT,
@@ -198,6 +240,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     updated_at TEXT NOT NULL,
     UNIQUE(name),
     CHECK(enabled IN (0, 1)),
+    CHECK(disable_inherited_on_finish IN (0, 1)),
     CHECK(concurrency_policy IN ('forbid', 'queue', 'replace'))
 );
 
@@ -230,6 +273,22 @@ CREATE TABLE IF NOT EXISTS job_run_outputs (
     CHECK(stderr_truncated IN (0, 1))
 );
 
+CREATE TABLE IF NOT EXISTS run_hook_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    event TEXT NOT NULL,
+    sink_type TEXT NOT NULL,
+    attempt INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    http_status_code INTEGER,
+    error_message TEXT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    FOREIGN KEY(run_id) REFERENCES job_runs(id) ON DELETE CASCADE,
+    CHECK(sink_type IN ('command', 'http')),
+    CHECK(status IN ('succeeded', 'failed', 'timed_out'))
+);
+
 CREATE TABLE IF NOT EXISTS instance_metadata (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -241,6 +300,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_enabled_next_run_at ON jobs(enabled, next_ru
 CREATE INDEX IF NOT EXISTS idx_job_runs_job_id_queued_at ON job_runs(job_id, queued_at DESC);
 CREATE INDEX IF NOT EXISTS idx_job_runs_status_queued_at ON job_runs(status, queued_at ASC);
 CREATE INDEX IF NOT EXISTS idx_job_runs_scheduled_for ON job_runs(scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_run_hook_deliveries_run_id_attempt ON run_hook_deliveries(run_id, attempt);
 ```
 
 ## Operational Notes
@@ -278,6 +338,7 @@ For the initial release, this subset is enough:
 - `jobs`
 - `job_runs`
 - `job_run_outputs`
+- `run_hook_deliveries`
 
 `instance_metadata` is useful, but not strictly required for the minimum
 viable product.

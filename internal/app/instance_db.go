@@ -10,10 +10,12 @@ import (
 )
 
 type instanceDB struct {
-	Paths config.Paths
-	DB    *sql.DB
-	Jobs  *sqlite.JobStore
-	Runs  *sqlite.RunStore
+	Paths          config.Paths
+	DB             *sql.DB
+	Jobs           *sqlite.JobStore
+	Runs           *sqlite.RunStore
+	Metadata       *sqlite.MetadataStore
+	HookDeliveries *sqlite.RunHookDeliveryStore
 }
 
 func openInstanceDB(ctx context.Context, instance string) (*instanceDB, func() error, error) {
@@ -33,10 +35,12 @@ func openInstanceDB(ctx context.Context, instance string) (*instanceDB, func() e
 	}
 
 	instanceDB := &instanceDB{
-		Paths: paths,
-		DB:    db,
-		Jobs:  sqlite.NewJobStore(db),
-		Runs:  sqlite.NewRunStore(db),
+		Paths:          paths,
+		DB:             db,
+		Jobs:           sqlite.NewJobStore(db),
+		Runs:           sqlite.NewRunStore(db),
+		Metadata:       sqlite.NewMetadataStore(db),
+		HookDeliveries: sqlite.NewRunHookDeliveryStore(db),
 	}
 
 	return instanceDB, db.Close, nil

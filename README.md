@@ -114,6 +114,23 @@ jobsd run list --instance dev
 jobsd run get --instance dev --run-id 1
 ```
 
+Configure an instance-level `on_finish` hook:
+
+```bash
+jobsd scheduler on-finish set \
+  --instance dev \
+  --config-json '{"type":"http","http":{"url":"http://127.0.0.1:8080/hooks/jobsd"}}'
+```
+
+Override the hook for one job:
+
+```bash
+jobsd job update \
+  --instance dev \
+  --name cleanup \
+  --on-finish-config-json '{"type":"command","command":{"program":"echo","args":["hook"]}}'
+```
+
 Stop the scheduler:
 
 ```bash
@@ -162,6 +179,55 @@ jobsd job resume --instance dev --name cleanup
 jobsd job delete --instance dev --name cleanup
 ```
 
+`on_finish` integration:
+
+```bash
+jobsd scheduler on-finish get --instance dev
+jobsd scheduler on-finish set --instance dev --config-json '{"type":"http","http":{"url":"http://127.0.0.1:8080/hooks/jobsd"}}'
+jobsd scheduler on-finish clear --instance dev
+jobsd job add --instance dev --name cleanup --schedule "every 10m" --command "echo cleanup" --on-finish-config-json '{"type":"command","command":{"program":"echo"}}'
+jobsd job update --instance dev --name cleanup --disable-inherited-on-finish
+jobsd job update --instance dev --name cleanup --inherit-on-finish
+jobsd job update --instance dev --name cleanup --clear-on-finish
+```
+
+`on_finish` delivery data:
+
+- `command` hooks receive the payload JSON on `stdin`.
+- `command` hooks also receive `JOBSD_EVENT`, `JOBSD_INSTANCE`, and `JOBSD_RUN_ID` in the environment.
+- `http` hooks receive the same JSON payload in the `POST` body.
+- `http` hooks always set `Content-Type: application/json` and then apply any configured custom headers.
+
+Example payload:
+
+```json
+{
+  "version": 1,
+  "event": "run.finished",
+  "instance": "dev",
+  "job_name": "cleanup",
+  "run_id": 11,
+  "schedule": "every 10m",
+  "command": "echo cleanup",
+  "status": "succeeded",
+  "exit_code": 0,
+  "started_at": "2025-04-10T10:00:00Z",
+  "finished_at": "2025-04-10T10:00:03Z",
+  "duration_ms": 3000,
+  "stdout_preview": "hello",
+  "stderr_preview": "warn",
+  "stdout_path": null,
+  "stderr_path": null
+}
+```
+
+Payload notes:
+
+- `event` is currently always `run.finished`.
+- `status` matches the finalized run status and is not rewritten when hook delivery fails.
+- `stdout_preview` and `stderr_preview` are capped to `2048` bytes each.
+- `stdout_path` and `stderr_path` are reserved for future use and are currently `null`.
+
 Run inspection:
 
 ```bash
@@ -202,6 +268,10 @@ Starting the same instance twice is rejected by the lock layer.
 - Unix-like systems execute job commands with `sh -lc`.
 - Windows executes job commands with `cmd /C`.
 - Output capture is stored in SQLite and capped at `64 KiB` per stream.
+- `on_finish` supports one sink per scope in v1: `command` or `http`.
+- Hook payloads are always JSON and use the same schema for both sink types.
+- HTTP hooks are restricted to loopback targets such as `127.0.0.1` and `localhost`.
+- Hook delivery failures are recorded separately and do not change the main job run result.
 
 ## Additional documentation
 
