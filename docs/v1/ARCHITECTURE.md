@@ -128,6 +128,14 @@ Suggested split:
 - `executor.go`: command execution, output capture, and terminal run results
 - `on_finish.go`: shared hook payload construction plus `command` and loopback `http` delivery
 
+`on_finish` delivery contract:
+
+- both sink types use the same JSON payload schema for `run.finished`
+- `command` hooks receive the payload on `stdin` plus `JOBSD_EVENT`, `JOBSD_INSTANCE`, and `JOBSD_RUN_ID`
+- `http` hooks send `POST` requests with `Content-Type: application/json`
+- command and HTTP delivery failures are recorded in `run_hook_deliveries` and do not overwrite the finalized run status
+- preview fields are truncated to `2048` bytes per stream and path fields are reserved for future expansion
+
 This package should focus on orchestration, not SQL details.
 Platform-specific daemon launch behavior may live behind small helpers so
 Windows backgrounding can differ internally without changing the public

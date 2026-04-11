@@ -191,6 +191,43 @@ jobsd job update --instance dev --name cleanup --inherit-on-finish
 jobsd job update --instance dev --name cleanup --clear-on-finish
 ```
 
+`on_finish` delivery data:
+
+- `command` hooks receive the payload JSON on `stdin`.
+- `command` hooks also receive `JOBSD_EVENT`, `JOBSD_INSTANCE`, and `JOBSD_RUN_ID` in the environment.
+- `http` hooks receive the same JSON payload in the `POST` body.
+- `http` hooks always set `Content-Type: application/json` and then apply any configured custom headers.
+
+Example payload:
+
+```json
+{
+  "version": 1,
+  "event": "run.finished",
+  "instance": "dev",
+  "job_name": "cleanup",
+  "run_id": 11,
+  "schedule": "every 10m",
+  "command": "echo cleanup",
+  "status": "succeeded",
+  "exit_code": 0,
+  "started_at": "2025-04-10T10:00:00Z",
+  "finished_at": "2025-04-10T10:00:03Z",
+  "duration_ms": 3000,
+  "stdout_preview": "hello",
+  "stderr_preview": "warn",
+  "stdout_path": null,
+  "stderr_path": null
+}
+```
+
+Payload notes:
+
+- `event` is currently always `run.finished`.
+- `status` matches the finalized run status and is not rewritten when hook delivery fails.
+- `stdout_preview` and `stderr_preview` are capped to `2048` bytes each.
+- `stdout_path` and `stderr_path` are reserved for future use and are currently `null`.
+
 Run inspection:
 
 ```bash
